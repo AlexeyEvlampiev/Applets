@@ -58,7 +58,7 @@ namespace Applets.Common
 
             Task RoutedProcessOneAsync(IDeliveryArgs args, CancellationToken cancellation)
             {
-                if (handlerResolverByIntent.TryGetValue(args.Intent, out var router))
+                if (handlerResolverByIntent.TryGetValue(args.IntentId, out var router))
                 {
                     var handler = router.GetHandler(args.Dto) 
                                   ?? throw new NullReferenceException(
@@ -148,7 +148,7 @@ namespace Applets.Common
             cancellation.ThrowIfCancellationRequested();
             var logMessage = new StringBuilder($"No appropriate handler found for the incoming message.")
                 .Append($" Applet: {Channel.AppletName} ({Channel.AppletId})")
-                .Append($" Intent: {args.IntentName} ({args.Intent})")
+                .Append($" Intent: {args.IntentName} ({args.IntentId})")
                 .ToString();
             Debug.Fail(logMessage);
             Trace.TraceError(logMessage);

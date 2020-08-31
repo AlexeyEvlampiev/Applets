@@ -251,7 +251,7 @@ namespace Applets.Common
         public object Deserialize(DeliveryArgs args)
         {
             if (args == null) throw new ArgumentNullException(nameof(args));
-            if (_dtoTypeInfoByGuid.TryGetValue(args.Contract, out var info))
+            if (_dtoTypeInfoByGuid.TryGetValue(args.DataContractId, out var info))
             {
                 return info.Serializer.Deserialize(args.Body, info.DtoType);
             }
@@ -266,7 +266,7 @@ namespace Applets.Common
                 var body = info.Serializer.Serialize(dto, out var contentType);
                 return new DispatchArgs(body)
                 {
-                    Contract = dto.GetType().GUID,
+                    DataContractId = dto.GetType().GUID,
                     ContentType = contentType
                 };
             }
@@ -282,7 +282,7 @@ namespace Applets.Common
                 var body = Encoding.UTF8.GetBytes(text);
                 return new DispatchArgs(body)
                 {
-                    Contract = typeof(string).GUID,
+                    DataContractId = typeof(string).GUID,
                     ContentType = "text/plain"
                 };
             }
@@ -291,7 +291,7 @@ namespace Applets.Common
                 var body = DtoSerializer.Default.Serialize(dto, out var contentType);
                 return new DispatchArgs(body)
                 {
-                    Contract = typeof(object).GUID,
+                    DataContractId = typeof(object).GUID,
                     ContentType = contentType
                 };
             }

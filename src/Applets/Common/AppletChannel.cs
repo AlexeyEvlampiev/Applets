@@ -44,7 +44,7 @@ namespace Applets.Common
 
             _privateResponses
                 .SubscribeOn(_privateEventLoopScheduler)
-                .Where(response => _privateResponseObserversByCorrelationId.ContainsKey(response.Correlation))
+                .Where(response => _privateResponseObserversByCorrelationId.ContainsKey(response.CorrelationId))
                 .Subscribe(
                     OnPrivateResponse, 
                     OnPrivateResponsesError, 
@@ -58,7 +58,7 @@ namespace Applets.Common
                 .Select(ToDispatchArgs)
                 .Subscribe(args =>
                 {
-                    args.Intent = AppInfo.HeartbeatIntent;
+                    args.IntentId = AppInfo.HeartbeatIntent;
                     SendAsync(args);
                 });
         }
@@ -70,7 +70,7 @@ namespace Applets.Common
 
         private void OnPrivateResponse(IDeliveryArgs response)
         {
-            if (_privateResponseObserversByCorrelationId.TryGetValue(response.Correlation, out var targetObserver))
+            if (_privateResponseObserversByCorrelationId.TryGetValue(response.CorrelationId, out var targetObserver))
             {
                 targetObserver.OnNext(response);
             }
@@ -116,18 +116,18 @@ namespace Applets.Common
         {
             if (args == null) throw new ArgumentNullException(nameof(args));
             cancellation.ThrowIfCancellationRequested();
-            if (CanSend(args.Intent))
+            if (CanSend(args.IntentId))
             {
                 args.From = this.Instance;
-                args.Applet = this.AppletId;
+                args.AppletId = this.AppletId;
                 return this.BroadcastAsync(args, cancellation);
             }
 
-            var intentName = _appInfo.GetIntentName(args.Intent);
+            var intentName = _appInfo.GetIntentName(args.IntentId);
             throw new InvalidOperationException(
                 new StringBuilder($"The specified outgoing message intent is forbidden for this applet.")
                     .Append($" Sender applet: {AppletName} ({AppletId}).")
-                    .Append($" Message intent: {intentName} ({args.Intent}).")
+                    .Append($" Message intent: {intentName} ({args.IntentId}).")
                     .Append($" See {_appInfo.GetType()} type constructor.")
                     .ToString()
             );
@@ -144,8 +144,8 @@ namespace Applets.Common
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
             var args = ToDispatchArgs(request);
-            args.Intent = intent;
-            args.Correlation = Guid.NewGuid();
+            args.IntentId = intent;
+            args.CorrelationId = Guid.NewGuid();
             return GetResponses(args);
         }
 
@@ -173,7 +173,7 @@ namespace Applets.Common
         {
             if (args == null) throw new ArgumentNullException(nameof(args));
             if (false == args.HasCorrelationId)
-                throw new ArgumentException($"{nameof(args)}.{nameof(args.Correlation)} is missing.");
+                throw new ArgumentException($"{nameof(args)}.{nameof(args.CorrelationId)} is missing.");
 
             if (0 == Interlocked.CompareExchange(ref _privateResponsesConnected, 1, 0))
             {
@@ -192,10 +192,10 @@ namespace Applets.Common
             {
                 observer = observer.NotifyOn(TaskPoolScheduler.Default);
                 var subscription = Disposable.Create(() =>
-                    _privateResponseObserversByCorrelationId.Remove(args.Correlation));
+                    _privateResponseObserversByCorrelationId.Remove(args.CorrelationId));
                 try
                 {
-                    _privateResponseObserversByCorrelationId.TryAdd(args.Correlation, observer);
+                    _privateResponseObserversByCorrelationId.TryAdd(args.CorrelationId, observer);
                     SendAsync(args);
                     return subscription;
                 }
@@ -208,7 +208,7 @@ namespace Applets.Common
             }
 
             bool IsIntentPermitted(IDeliveryArgs reply) =>
-                _appInfo.IsExpectedReply(AppletId, args.Intent, reply.Intent);
+                _appInfo.IsExpectedReply(AppletId, args.IntentId, reply.IntentId);
 
             void InspectAndLog(IDeliveryArgs reply)
             {
@@ -216,7 +216,7 @@ namespace Applets.Common
                 {
                     Trace.TraceError(new StringBuilder("Unexpected Fan-Out response.")
                         .Append($" Initiating applet: {AppletName}.")
-                        .Append($" Fan-Out request: {_appInfo.GetIntentName(args.Intent)}.")
+                        .Append($" Fan-Out request: {_appInfo.GetIntentName(args.IntentId)}.")
                         .Append($" Fan-Out response: {reply.IntentName}.")
                         .ToString()
                     );
@@ -236,7 +236,7 @@ namespace Applets.Common
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
             var args = ToDispatchArgs(data);
-            args.Intent = AppInfo.ErrorIntent;
+            args.IntentId = AppInfo.ErrorIntent;
             return SendAsync(args, cancellation);
         }
 
@@ -244,7 +244,7 @@ namespace Applets.Common
         {
             if (String.IsNullOrWhiteSpace(message)) throw new ArgumentException($"Message text is required", nameof(message));
             var args = ToDispatchArgs(message);
-            args.Intent = AppInfo.ErrorIntent;
+            args.IntentId = AppInfo.ErrorIntent;
             return SendAsync(args, cancellation);
         }
 
@@ -252,7 +252,7 @@ namespace Applets.Common
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
             var args = ToDispatchArgs(data);
-            args.Intent = AppInfo.WarningIntent;
+            args.IntentId = AppInfo.WarningIntent;
             return SendAsync(args, cancellation);
         }
 
@@ -260,7 +260,7 @@ namespace Applets.Common
         {
             if (String.IsNullOrWhiteSpace(message)) throw new ArgumentException($"Message text is required", nameof(message));
             var args = ToDispatchArgs(message);
-            args.Intent = AppInfo.WarningIntent;
+            args.IntentId = AppInfo.WarningIntent;
             return SendAsync(args, cancellation);
         }
 
@@ -268,7 +268,7 @@ namespace Applets.Common
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
             var args = ToDispatchArgs(data);
-            args.Intent = AppInfo.InfoIntent;
+            args.IntentId = AppInfo.InfoIntent;
             return SendAsync(args, cancellation);
         }
 
@@ -276,7 +276,7 @@ namespace Applets.Common
         {
             if (String.IsNullOrWhiteSpace(message)) throw new ArgumentException($"Message text is required", nameof(message));
             var args = ToDispatchArgs(message);
-            args.Intent = AppInfo.InfoIntent;
+            args.IntentId = AppInfo.InfoIntent;
             return SendAsync(args, cancellation);
         }
 
@@ -293,13 +293,13 @@ namespace Applets.Common
         public bool CanSend(DispatchArgs args)
         {
             if (args == null) throw new ArgumentNullException(nameof(args));
-            return CanSend(args.Intent);
+            return CanSend(args.IntentId);
         }
 
         public bool CanReceiveEventNotification(IDeliveryArgs args)
         {
             if (args == null) throw new ArgumentNullException(nameof(args));
-            return CanReceiveEventNotification(args.Intent) && args.From != this.Instance;
+            return CanReceiveEventNotification(args.IntentId) && args.From != this.Instance;
         }
 
 
@@ -311,14 +311,14 @@ namespace Applets.Common
         public DispatchArgs ToDispatchArgs(object dto)
         {
             var args = _appInfo.ToDispatchArgs(dto);
-            args.Applet = this.AppletId;
+            args.AppletId = this.AppletId;
             args.From = this.Instance;
             return args;
         }
 
         protected bool IsSubscribedFor(DeliveryArgs args)
         {
-            return _appInfo.CanReceiveEventNotification(AppletId, args.Intent);
+            return _appInfo.CanReceiveEventNotification(AppletId, args.IntentId);
         }
 
         protected virtual void Dispose(bool disposing)

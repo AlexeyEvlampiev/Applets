@@ -22,19 +22,19 @@ namespace Applets.Common
 
         public IAppletChannel Channel { get; }
 
-        public Guid Intent { get; protected set; }
+        public Guid IntentId { get; protected set; }
 
-        public string IntentName => _appInfo.GetIntentName(Intent);
+        public string IntentName => _appInfo.GetIntentName(IntentId);
 
-        public Guid Correlation { get; protected set; }
+        public Guid CorrelationId { get; protected set; }
 
         public Guid From { get; protected set; }
 
-        public Guid Contract { get; protected set; }
+        public Guid DataContractId { get; protected set; }
 
-        public Guid Applet { get; protected set; }
+        public Guid AppletId { get; protected set; }
 
-        public string AppletName => _appInfo.GetAppletName(Applet);
+        public string AppletName => _appInfo.GetAppletName(AppletId);
 
         [DebuggerStepThrough]
         public Task ReplyWithAsync(object dto, CancellationToken cancellation)
@@ -46,16 +46,16 @@ namespace Applets.Common
         public Task ReplyWithAsync(DispatchArgs reply, CancellationToken cancellation)
         {
             if (reply == null) throw new ArgumentNullException(nameof(reply));
-            if (reply.Correlation == Guid.Empty)
-                reply.Correlation = this.Correlation;
+            if (reply.CorrelationId == Guid.Empty)
+                reply.CorrelationId = this.CorrelationId;
             if (reply.To == Guid.Empty)
                 reply.To = this.From;
-            if (reply.Intent == Guid.Empty)
-                reply.Intent = reply.Contract;
+            if (reply.IntentId == Guid.Empty)
+                reply.IntentId = reply.DataContractId;
             return Channel.SendAsync(reply, cancellation);
         }
 
-        public bool HasCorrelationId => Correlation != Guid.Empty;
+        public bool HasCorrelationId => CorrelationId != Guid.Empty;
 
 
         public object Dto

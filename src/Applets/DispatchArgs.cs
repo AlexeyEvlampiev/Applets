@@ -12,13 +12,13 @@ namespace Applets
 
         public byte[] Body { get; }
 
-        public Guid Correlation { get; set; }
+        public Guid CorrelationId { get; set; }
 
-        public Guid Contract { get; set; }
+        public Guid DataContractId { get; set; }
 
-        public Guid Intent { get; set; }
+        public Guid IntentId { get; set; }
 
-        public Guid Applet { get; internal set; }
+        public Guid AppletId { get; internal set; }
 
         public Guid To { get; set; }
 
@@ -26,6 +26,6 @@ namespace Applets
 
         public string ContentType { get; internal set; }
 
-        public bool HasCorrelationId => (Correlation != Guid.Empty);
+        public bool HasCorrelationId => (CorrelationId != Guid.Empty);
     }
 }

@@ -7,12 +7,12 @@ namespace Applets
     public interface IDeliveryArgs
     {
         byte[] Body { get; }
-        Guid Intent { get; }
+        Guid IntentId { get; }
         string IntentName { get; }
-        Guid Correlation { get; }
+        Guid CorrelationId { get; }
         Guid From { get; }
-        Guid Contract { get; }
-        Guid Applet { get; }
+        Guid DataContractId { get; }
+        Guid AppletId { get; }
         string AppletName { get; }
         object Dto { get; }
         Task ReplyWithAsync(object dto, CancellationToken cancellation);

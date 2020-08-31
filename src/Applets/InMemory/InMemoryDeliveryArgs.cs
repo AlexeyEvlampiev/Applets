@@ -9,11 +9,11 @@ namespace Applets.InMemory
             : base(dispatchArgs.Body, channel)
         {
             if (dispatchArgs == null) throw new ArgumentNullException(nameof(dispatchArgs));
-            Intent = dispatchArgs.Intent;
-            Correlation = dispatchArgs.Correlation;
+            IntentId = dispatchArgs.IntentId;
+            CorrelationId = dispatchArgs.CorrelationId;
             From = dispatchArgs.From;
-            Contract = dispatchArgs.Contract;
-            Applet = dispatchArgs.Applet;
+            DataContractId = dispatchArgs.DataContractId;
+            AppletId = dispatchArgs.AppletId;
         }
     }
 }

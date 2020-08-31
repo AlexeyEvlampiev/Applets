@@ -18,6 +18,20 @@ namespace Applets.Common
                        throw new NullReferenceException($"{nameof(channel)}.{nameof(Channel.GetAppInfo)} returned null");
         }
 
+        protected DeliveryArgs(DispatchArgs dispatchArgs, IAppletChannel channel)
+        {
+            if (dispatchArgs == null) throw new ArgumentNullException(nameof(dispatchArgs));
+            Body = dispatchArgs.Body ?? throw new NullReferenceException(nameof(dispatchArgs.Body));
+            Channel = channel ?? throw new ArgumentNullException(nameof(channel));
+            _appInfo = Channel.GetAppInfo() ??
+                       throw new NullReferenceException($"{nameof(channel)}.{nameof(Channel.GetAppInfo)} returned null");
+            IntentId = dispatchArgs.IntentId;
+            CorrelationId = dispatchArgs.CorrelationId;
+            From = dispatchArgs.From;
+            DataContractId = dispatchArgs.DataContractId;
+            AppletId = dispatchArgs.AppletId;
+        }
+
         public byte[] Body { get; }
 
         public IAppletChannel Channel { get; }

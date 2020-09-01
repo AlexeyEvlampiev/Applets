@@ -14,10 +14,10 @@ namespace Applets.Common
 
         public IAppletChannel Create(Guid appletId)
         {
-            if(AppInfo.IsAppletId(appletId))
+            if(false == AppInfo.IsAppletId(appletId))
                 throw new ArgumentException(
                     new StringBuilder($"Invalid applet ID.")
-                        .Append($" '{appletId}' is not a known appled identifier.")
+                        .Append($" '{appletId}' is not a known applet identifier.")
                         .ToString());
             return CreateAppletChannel(appletId) 
                 ?? throw new NullReferenceException($"{nameof(GetType)}.{nameof(CreateAppletChannel)} returned null.");

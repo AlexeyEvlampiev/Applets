@@ -10,9 +10,9 @@ namespace Applets.InMemory
 {
     class InMemoryAppletChannel : AppletChannel
     {
-        private readonly Subject<InMemoryDeliveryArgs> _topic;
+        private readonly Subject<DispatchArgs> _topic;
 
-        public InMemoryAppletChannel(Guid appletId, IAppInfo appInfo, Subject<InMemoryDeliveryArgs> topic) 
+        public InMemoryAppletChannel(Guid appletId, IAppInfo appInfo, Subject<DispatchArgs> topic) 
             : base(appletId, appInfo)
         {
             _topic = topic ?? throw new ArgumentNullException(nameof(topic));
@@ -22,6 +22,7 @@ namespace Applets.InMemory
         {
             return _topic
                 .Where(args => args.HasCorrelationId && args.From != this.Instance)
+                .Select(args=> new InMemoryDeliveryArgs(args, this))
                 .ObserveOn(TaskPoolScheduler.Default);
         }
 
@@ -32,6 +33,7 @@ namespace Applets.InMemory
             var cancellation = new CancellationTokenSource();
             return _topic
                 .Do(args => { }, cancellation.Cancel)
+                .Select(args => new InMemoryDeliveryArgs(args, this))
                 .Where(CanReceiveEventNotification)
                 .SelectMany(async args =>
                 {
@@ -43,7 +45,7 @@ namespace Applets.InMemory
 
         protected override Task BroadcastAsync(DispatchArgs args, CancellationToken cancellation)
         {
-            _topic.OnNext(new InMemoryDeliveryArgs(args, this));
+            _topic.OnNext(args);
             return Task.CompletedTask;
         }
     }

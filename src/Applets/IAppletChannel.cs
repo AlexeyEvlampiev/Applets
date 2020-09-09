@@ -43,5 +43,6 @@ namespace Applets
 
         bool CanSend(DispatchArgs args);
         bool CanReceiveEventNotification(IDeliveryArgs args);
+        void Pulse();
     }
 }

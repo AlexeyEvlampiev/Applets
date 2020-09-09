@@ -7,5 +7,6 @@ namespace Applets.ComponentModel
         bool TryCompleteWith(IDeliveryArgs reply);
         T Result { get; }
         TimeSpan Timeout { get; }
+        bool HasResult { get; }
     }
 }

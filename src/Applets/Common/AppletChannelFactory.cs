@@ -8,6 +8,7 @@ namespace Applets.Common
         protected AppletChannelFactory(IAppInfo appInfo)
         {
             AppInfo = appInfo ?? throw new ArgumentNullException(nameof(appInfo));
+            AppInfo.Assert();
         }
 
         protected IAppInfo AppInfo { get; }

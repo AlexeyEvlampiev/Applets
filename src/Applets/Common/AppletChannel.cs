@@ -20,7 +20,7 @@ namespace Applets.Common
         private readonly IConnectableObservable<IDeliveryArgs> _privateResponses;
         readonly Dictionary<Guid, IObserver<IDeliveryArgs>> _privateResponseObserversByCorrelationId = new Dictionary<Guid, IObserver<IDeliveryArgs>>();
         private int _privateResponsesConnected;
-        private readonly Subject<IDeliveryArgs> _pulse = new Subject<IDeliveryArgs>();
+        private readonly Subject<Unit> _pulse = new Subject<Unit>();
 
 
         protected AppletChannel(Guid appletId, IAppInfo appInfo)
@@ -38,7 +38,7 @@ namespace Applets.Common
                 .TakeUntil(disposing)
                 .ObserveOn(_privateEventLoopScheduler)
                 .Do(InspectPrivateResponse)
-                .Do(_pulse)
+                .Do(args=> Pulse())
                 .Where(IsValidResponse)
                 .Publish();
 
@@ -116,10 +116,11 @@ namespace Applets.Common
         {
             if (args == null) throw new ArgumentNullException(nameof(args));
             cancellation.ThrowIfCancellationRequested();
+            args.From = this.Instance;
+            args.AppletId = this.AppletId;
+
             if (CanSend(args.IntentId))
             {
-                args.From = this.Instance;
-                args.AppletId = this.AppletId;
                 return this.BroadcastAsync(args, cancellation);
             }
 
@@ -154,7 +155,7 @@ namespace Applets.Common
         {
             return Observable
                 .Defer(() => RegisterEventNotificationsHandler(processOneAsync))
-                .Do(_pulse);
+                .Do(args=> Pulse());
         }
 
         protected abstract IObservable<IDeliveryArgs> RegisterEventNotificationsHandler(
@@ -300,6 +301,11 @@ namespace Applets.Common
         {
             if (args == null) throw new ArgumentNullException(nameof(args));
             return CanReceiveEventNotification(args.IntentId) && args.From != this.Instance;
+        }
+
+        public void Pulse()
+        {
+            _pulse.OnNext(Unit.Default);
         }
 
 

@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Applets.InMemory;
 
 namespace Applets.Common
 {
@@ -31,6 +32,7 @@ namespace Applets.Common
             DataContractId = dispatchArgs.DataContractId;
             AppletId = dispatchArgs.AppletId;
         }
+
 
         public byte[] Body { get; }
 

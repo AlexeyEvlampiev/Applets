@@ -5,13 +5,15 @@ namespace Applets.ComponentModel
 {
     sealed class FirstInWinsFanInPolicy<T> : IFanInPolicy<T> 
     {
-        public TimeSpan Timeout { get; }
         private int _isCompleted;
 
         public FirstInWinsFanInPolicy(TimeSpan timeout)
         {
             Timeout = timeout;
         }
+
+        public TimeSpan Timeout { get; }
+        public bool HasResult => Thread.VolatileRead(ref _isCompleted) != 0;
 
         public bool TryCompleteWith(IDeliveryArgs reply)
         {

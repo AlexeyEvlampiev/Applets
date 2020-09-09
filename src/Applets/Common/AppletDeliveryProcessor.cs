@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -10,11 +11,11 @@ using Applets.ComponentModel;
 
 namespace Applets.Common
 {
-    public abstract class AppletBacklogProcessor : IAppletBacklogProcessor
+    public abstract class AppletDeliveryProcessor : IAppletDeliveryProcessor
     {
         private readonly DEventNotificationHandler _generalizedMessageHandler;
 
-        protected AppletBacklogProcessor(IAppletChannel channel)
+        protected AppletDeliveryProcessor(IAppletChannel channel)
         {
             Channel = channel ?? throw new ArgumentNullException(nameof(channel));
             _generalizedMessageHandler = CreateGeneralizedMessageHandler(channel);
@@ -24,17 +25,18 @@ namespace Applets.Common
         public IAppletChannel Channel { get; }
 
         [DebuggerStepThrough]
-        public Task ProcessOneAsync(DeliveryArgs args, CancellationToken cancellation)
+        public Task ProcessOneAsync(IDeliveryArgs args, CancellationToken cancellation)
         {
             cancellation.ThrowIfCancellationRequested();
             return _generalizedMessageHandler.Invoke(args, cancellation);
         }
 
-        public Task ProcessOneAsync(Func<DeliveryArgs> deferredArgs, CancellationToken cancellation)
+        public async Task ProcessOneAsync(Func<IDeliveryArgs> deferredArgs, CancellationToken cancellation)
         {
             cancellation.ThrowIfCancellationRequested();
             var args = deferredArgs.Invoke();
-            return _generalizedMessageHandler.Invoke(args, cancellation);
+            await _generalizedMessageHandler.Invoke(args, cancellation);
+            Channel.Pulse();
         }
 
         public async Task ProcessAsync(CancellationToken cancellation)
@@ -95,8 +97,8 @@ namespace Applets.Common
             var candidateMethods =
                 (from mi in instanceMethods.Where(mi => mi != processUnmappedMessageAsyncMethodInfo)
                  let parameters = mi.GetParameters()
-                 where parameters.Length > 1
-                 where parameters.Any(p => typeof(DeliveryArgs).IsAssignableFrom(p.ParameterType))
+                 where parameters.Length >= 1
+                 where parameters.Count(p => p.ParameterType == typeof(IDeliveryArgs)) ==1
                  let intentAtt = mi.GetCustomAttribute<IntentAttribute>()
                  select new
                  {
@@ -119,7 +121,7 @@ namespace Applets.Common
                 }
 
                 var customParameters = parameters
-                    .Where(p => false == typeof(DeliveryArgs).IsAssignableFrom(p.ParameterType) &&
+                    .Where(p => p.ParameterType != typeof(IDeliveryArgs) &&
                                 false == (typeof(CancellationToken) == p.ParameterType)).ToList();
                 var dynamicBindingParameters = customParameters
                     .Where(cp => false == typeof(IAppletChannel).IsAssignableFrom(cp.ParameterType))
@@ -154,5 +156,7 @@ namespace Applets.Common
             Trace.TraceError(logMessage);
             return Task.CompletedTask;
         }
+
+
     }
 }

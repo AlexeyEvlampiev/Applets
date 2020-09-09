@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
@@ -6,17 +7,25 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using Applets.ComponentModel;
 
 namespace Applets.Common
 {
     public abstract class AppInfo : IAppInfo
     {
-        private Action _assertCallback;
-        public static readonly Guid InfoIntent = Guid.Parse("10000000-0000-0000-0000-000000000000");
-        public static readonly Guid HeartbeatIntent = Guid.Parse("11000000-0000-0000-0000-000000000000");
-        public static readonly Guid WarningIntent = Guid.Parse("20000000-0000-0000-0000-000000000000");
-        public static readonly Guid ErrorIntent = Guid.Parse("30000000-0000-0000-0000-000000000000");
+        public const string InfoIntentGuid = "10000000-0000-0000-0000-000000000000";
+        public const string HeartbeatIntentGuid = "11000000-0000-0000-0000-000000000000";
+        public const string WarningIntentGuid = "20000000-0000-0000-0000-000000000000";
+        public const string ErrorIntentGuid = "30000000-0000-0000-0000-000000000000";
+
+        public static readonly Guid InfoIntent = Guid.Parse(InfoIntentGuid);
+        public static readonly Guid HeartbeatIntent = Guid.Parse(HeartbeatIntentGuid);
+        public static readonly Guid WarningIntent = Guid.Parse(WarningIntentGuid);
+        public static readonly Guid ErrorIntent = Guid.Parse(ErrorIntentGuid);
+
+        private int _asserted;
+        
         private static readonly TimeSpan DefaultHeartbeatInterval = TimeSpan.FromSeconds(10);
 
         private readonly Guid _applicationId;
@@ -29,13 +38,15 @@ namespace Applets.Common
         private HashSet<Binding> _incomingMessageBindings = new HashSet<Binding>();
         private HashSet<Binding> _outgoingMessageBindings = new HashSet<Binding>();
         private HashSet<Binding> _privateResponseBindings = new HashSet<Binding>();
-        private HashSet<ReplyBinding> _fanOutReplyBindings = new HashSet<ReplyBinding>();
+        private HashSet<ReplyBinding> _fanInIntentBindings = new HashSet<ReplyBinding>();
+        private HashSet<Guid> _catchAllIncomingIntentAppletIds = new HashSet<Guid>();
         private readonly HashSet<Guid> _standardIntents = new HashSet<Guid>()
         {
             InfoIntent, WarningIntent, ErrorIntent, HeartbeatIntent
         };
+        private static readonly  ConcurrentDictionary<Type, AppInfo> _appInfosByType = new ConcurrentDictionary<Type, AppInfo>();
 
-        struct Binding
+        readonly struct Binding
         {
             public Guid Applet { get; }
             public Guid Intent { get; }
@@ -47,7 +58,7 @@ namespace Applets.Common
             }
         }
 
-        struct ReplyBinding
+        readonly struct ReplyBinding
         {
             public Guid Applet { get; }
             public Guid RequestIntent { get; }
@@ -60,13 +71,23 @@ namespace Applets.Common
                 ReplyIntent = replyIntent;
             }
         }
-        
+
+        public static T GetOrCreate<T>() where T : AppInfo, new()
+        {
+            return (T)_appInfosByType.GetOrAdd(typeof(T), type =>
+            {
+                var appInfo = new T();
+                appInfo.Assert();
+                return appInfo;
+            });
+        }
+
 
         protected AppInfo(Guid id, string applicationName)
         {
             _applicationId = id;
             ApplicationName = applicationName;
-            _assertCallback = Assert;
+
             RegisterDtoAssembly(GetType().Assembly);
         }
 
@@ -82,7 +103,7 @@ namespace Applets.Common
             _incomingMessageBindings.Add(new Binding(applet, intent));
         }
 
-        protected void RegisterFanOutReplyBinding(Guid applet, Guid requestIntent, Guid responseIntent)
+        protected void RegisterFanInIntent(Guid applet, Guid requestIntent, Guid responseIntent)
         {
             if (!_appletInfosById.ContainsKey(applet))
                 throw new ArgumentException($"Invalid applet ID. ID: {applet}");
@@ -93,8 +114,8 @@ namespace Applets.Common
             _outgoingMessageBindings.Add(new Binding(applet, requestIntent));
             _privateResponseBindings.Add(new Binding(applet, responseIntent));
             var binding = new ReplyBinding(applet, requestIntent, responseIntent);
-            _fanOutReplyBindings.Add(binding);
-            Debug.Assert(_fanOutReplyBindings.Contains(binding));
+            _fanInIntentBindings.Add(binding);
+            Debug.Assert(_fanInIntentBindings.Contains(binding));
         }
 
         protected void RegisterOutgoingIntent(Guid applet, Guid intent)
@@ -189,7 +210,17 @@ namespace Applets.Common
 
         public bool IsAppletId(Guid id) => _appletInfosById.ContainsKey(id);
 
-        void IAppInfo.Assert() => _assertCallback.Invoke();
+        void IAppInfo.Assert()
+        {
+            if (Interlocked.CompareExchange(ref _asserted, 1, 0) == 0)
+            {
+                this.Assert();
+            }
+            else
+            {
+                Debug.Write($"Redundant call to {GetType()}.{nameof(Assert)}");
+            }
+        }
         public IEnumerable<IntentInfo> GetAppletIncomingIntents(Guid appletId)
         {
             return
@@ -200,18 +231,23 @@ namespace Applets.Common
 
         public bool CanReceiveEventNotification(Guid appletId, Guid publicEventIntentId)
         {
-            return _incomingMessageBindings.Contains(new Binding(appletId, publicEventIntentId));
+            return _incomingMessageBindings.Contains(new Binding(appletId, publicEventIntentId)) ||
+                _catchAllIncomingIntentAppletIds.Contains(appletId);
         }
 
         public bool CanSend(Guid appletId, Guid intent)
         {
-            return _standardIntents.Contains(intent) || 
+            bool result = _standardIntents.Contains(intent) || 
                    _outgoingMessageBindings.Contains(new Binding(appletId, intent));
+            if (!result)
+            {
+                Debug.WriteLine($"Cannot send {GetIntentName(intent)} from {GetAppletName(appletId)}");
+            }
+            return result;
         }
 
         protected virtual void Assert()
         {
-            _assertCallback = () => Debug.WriteLine("Redundant assert call.");
             foreach (var intentId in _intentInfosById.Keys)
             {
                 bool isSent = _outgoingMessageBindings.Any(b => b.Intent == intentId);
@@ -239,12 +275,16 @@ namespace Applets.Common
             }
         }
 
-        public bool RequiresPublicInboxQueue(Guid appletId) => _incomingMessageBindings.Any(b => b.Applet == appletId);
+        public bool RequiresPublicInboxQueue(Guid appletId)
+        {
+            return _incomingMessageBindings.Any(b => b.Applet == appletId) ||
+                   _catchAllIncomingIntentAppletIds.Contains(appletId);
+        }
 
         public bool IsExpectedReply(Guid appletId, Guid requestIntent, Guid replyIntent)
         {
             var binding = new ReplyBinding(appletId, requestIntent, replyIntent);
-            var found = _fanOutReplyBindings.Contains(binding);
+            var found = _fanInIntentBindings.Contains(binding);
             return found;
         }
 
@@ -297,6 +337,16 @@ namespace Applets.Common
             }
         }
 
-        
+
+        protected void RegisterCatchAllIntentsAppletPolicy(Guid appletId)
+        {
+            if(_incomingMessageBindings.Any(b=> b.Applet == appletId))
+                throw new InvalidOperationException(
+                    new StringBuilder("Conflicting incoming intent bindings.")
+                        //TODO: add more details
+                        .ToString()
+                    );
+            _catchAllIncomingIntentAppletIds.Add(appletId);
+        }
     }
 }

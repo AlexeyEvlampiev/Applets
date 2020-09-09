@@ -15,11 +15,11 @@ namespace Applets
         readonly ConcurrentDictionary<Type, DEventNotificationHandler> 
             _handlersCache = new ConcurrentDictionary<Type, DEventNotificationHandler>();
 
-        private readonly AppletBacklogProcessor _processor;
+        private readonly AppletDeliveryProcessor _processor;
 
         delegate object DBuildInvocationParameter(IDeliveryArgs args, CancellationToken cancellation);
 
-        public MessageHandlerFactory(AppletBacklogProcessor processor, MethodInfo[] methods, DEventNotificationHandler fallback)
+        public MessageHandlerFactory(AppletDeliveryProcessor processor, MethodInfo[] methods, DEventNotificationHandler fallback)
         {
             if (processor == null) throw new ArgumentNullException(nameof(processor));
             if (methods == null) throw new ArgumentNullException(nameof(methods));
@@ -69,7 +69,7 @@ namespace Applets
 
             foreach (var parameterInfo in parameterInfos)
             {
-                if (parameterInfo.ParameterType == typeof(DeliveryArgs))
+                if (parameterInfo.ParameterType == typeof(IDeliveryArgs))
                 {
                     parameterBuildersList.Add((args, token) => args);
                 }

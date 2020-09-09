@@ -15,8 +15,8 @@ namespace Applets
         Guid AppletId { get; }
         string AppletName { get; }
         object Dto { get; }
-        Task ReplyWithAsync(object dto, CancellationToken cancellation);
-        Task ReplyWithAsync(DispatchArgs reply, CancellationToken cancellation);
+        Task ReplyWithAsync(object dto, CancellationToken cancellation = default);
+        Task ReplyWithAsync(DispatchArgs reply, CancellationToken cancellation = default);
 
         bool HasCorrelationId { get; }
     }

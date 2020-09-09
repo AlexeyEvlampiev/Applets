@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 
@@ -14,7 +15,9 @@ namespace Applets.ComponentModel
             await channel
                 .GetResponses(this)
                 .TakeWhile(reply => !policy.TryCompleteWith(reply))
-                .LastOrDefaultAsync();
+                .LastOrDefaultAsync()
+                .Timeout(policy.Timeout);
+            Debug.Assert(policy.HasResult);
             return policy.Result;
         }
     }

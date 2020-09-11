@@ -13,6 +13,7 @@ namespace Applets
         TimeSpan HeartbeatInterval { get; }
         bool RequiresPublicInboxQueue(Guid appletId);
 
+
         bool IsExpectedReply(Guid appletId, Guid requestIntent, Guid replyIntent);
 
         object Deserialize(DeliveryArgs args);

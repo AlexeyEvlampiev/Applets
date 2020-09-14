@@ -350,6 +350,8 @@ namespace Applets.Common
         [Obsolete]
         public bool IsExpectedReply(Guid appletId, Guid requestIntent, Guid replyIntent)
         {
+            if (replyIntent == AppInfo.ErrorIntent)
+                return true;
             var binding = new FanOutFanInIntentBinding(requestIntent, replyIntent);
             var found = _fanOutFanInIntentBindings.Contains(binding);
             return found;

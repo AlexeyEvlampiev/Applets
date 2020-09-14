@@ -9,7 +9,7 @@ namespace Applets.Common
         [Fact]
         public void SucceedForBalancedApp()
         {
-            IAppInfo target = new BalancedDummyAppInfo();
+            IAppInfo target = new CalculatorAppInfo();
             target.Assert();
         }
         

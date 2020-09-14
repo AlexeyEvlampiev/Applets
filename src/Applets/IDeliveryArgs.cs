@@ -16,8 +16,12 @@ namespace Applets
         string AppletName { get; }
         object Dto { get; }
         Task ReplyWithAsync(object dto, CancellationToken cancellation = default);
+
+        Task ReplyWithErrorAsync(object dto, CancellationToken cancellation = default);
         Task ReplyWithAsync(DispatchArgs reply, CancellationToken cancellation = default);
 
         bool HasCorrelationId { get; }
+        bool IsError { get;  }
+        string GetBodyAsString();
     }
 }

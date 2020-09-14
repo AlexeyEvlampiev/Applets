@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Applets.InMemory;
@@ -55,7 +56,16 @@ namespace Applets.Common
         [DebuggerStepThrough]
         public Task ReplyWithAsync(object dto, CancellationToken cancellation)
         {
+            if (dto == null) throw new ArgumentNullException(nameof(dto));
             var reply = _appInfo.ToDispatchArgs(dto);
+            return ReplyWithAsync(reply, cancellation);
+        }
+
+        public Task ReplyWithErrorAsync(object dto, CancellationToken cancellation)
+        {
+            if (dto == null) throw new ArgumentNullException(nameof(dto));
+            var reply = _appInfo.ToDispatchArgs(dto);
+            reply.IntentId = AppInfo.ErrorIntent;
             return ReplyWithAsync(reply, cancellation);
         }
 
@@ -72,6 +82,8 @@ namespace Applets.Common
         }
 
         public bool HasCorrelationId => CorrelationId != Guid.Empty;
+        public bool IsError => IntentId == AppInfo.ErrorIntent;
+        public string GetBodyAsString() => Encoding.UTF8.GetString(Body);
 
 
         public object Dto
@@ -83,6 +95,10 @@ namespace Applets.Common
             }
         }
 
-
+        public override string ToString()
+        {
+            return new StringBuilder($"{IntentName} sent by {AppletName}.")
+                .ToString();
+        }
     }
 }

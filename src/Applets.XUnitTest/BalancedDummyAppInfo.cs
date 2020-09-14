@@ -1,8 +1,9 @@
 ﻿using System;
+using Applets.Common;
 
-namespace Applets.Common
+namespace Applets
 {
-    sealed class BalancedDummyAppInfo : AppInfo
+    sealed class CalculatorAppInfo : AppInfo
     {
         private static readonly Guid ApplicationId = Guid.Parse("bc707d73-fcbf-43cb-903f-d1922cf64bbd");
 
@@ -13,7 +14,7 @@ namespace Applets.Common
         private static readonly Guid ServiceAppletId = Guid.Parse("6a3fb61d-c06d-4324-82c6-19507670ce19");
 
 
-        public BalancedDummyAppInfo() 
+        public CalculatorAppInfo() 
             : base(ApplicationId, "Balanced applications")
         {
             RegisterApplet(ClientAppletId, "Client applet");

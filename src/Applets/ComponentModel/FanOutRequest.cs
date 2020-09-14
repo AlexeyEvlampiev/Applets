@@ -8,13 +8,20 @@ namespace Applets.ComponentModel
     public abstract class FanOutRequest<T> : IFanOutRequest<T> where T : class
     {
         
-        public async Task<T> FanInAsync(IAppletChannel channel, IFanInPolicy<T> policy = null)
+        public async Task<T> AggregateResponsesAsync(IAppletChannel channel, IFanInPolicy<T> policy = null)
         {
             if (channel == null) throw new ArgumentNullException(nameof(channel));
             policy ??= FanInPolicy.FirstInWins<T>();
             await channel
                 .GetResponses(this)
-                .TakeWhile(reply => !policy.TryCompleteWith(reply))
+                .Select(reply =>
+                {
+                    if(reply.IsError)
+                        throw new BadFanOutRequestException(reply);
+                    policy.TryCompleteWith(reply);
+                    return reply;
+                })
+                .TakeWhile(reply => policy.HasResult == false)
                 .LastOrDefaultAsync()
                 .Timeout(policy.Timeout);
             Debug.Assert(policy.HasResult);

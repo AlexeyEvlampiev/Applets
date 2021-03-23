@@ -32,7 +32,7 @@ namespace Applets.Common
 
         private Dictionary<Guid, DtoInfo> _dtoTypeInfoByGuid = new Dictionary<Guid, DtoInfo>();
         private HashSet<Assembly> _dtoAssemblies = new HashSet<Assembly>();
-        private Dictionary<Type, DtoSerializer> _dtoSerializerByType = new Dictionary<Type, DtoSerializer>();
+        private Dictionary<Type, DtoSerializerOld> _dtoSerializerByType = new Dictionary<Type, DtoSerializerOld>();
         private Dictionary<Guid, AppletInfo> _appletInfosById = new Dictionary<Guid, AppletInfo>();
         private Dictionary<Guid, IntentInfo> _intentInfosById = new Dictionary<Guid, IntentInfo>();
         private HashSet<Binding> _incomingMessageBindings = new HashSet<Binding>();
@@ -158,13 +158,13 @@ namespace Applets.Common
 
             foreach (var item in items)
             {
-                var serializer = DtoSerializer.Default;
+                var serializer = DtoSerializerOld.Default;
                 if (item.SerializerType != null)
                 {
                     if (!_dtoSerializerByType.ContainsKey(item.SerializerType))
                     {
                         var instance = Activator.CreateInstance(item.SerializerType);
-                        serializer = (DtoSerializer) instance;
+                        serializer = (DtoSerializerOld) instance;
                         _dtoSerializerByType.Add(item.SerializerType, serializer);
                     }
                 }
@@ -328,7 +328,7 @@ namespace Applets.Common
             }
             else
             {
-                var body = DtoSerializer.Default.Serialize(dto, out var contentType);
+                var body = DtoSerializerOld.Default.Serialize(dto, out var contentType);
                 return new DispatchArgs(body)
                 {
                     DataContractId = typeof(object).GUID,

@@ -8,12 +8,12 @@ namespace Applets.Common
 
         public Guid Contract => DtoType.GUID;
 
-        public DtoSerializer Serializer { get; }
+        public DtoSerializerOld Serializer { get; }
 
-        public DtoInfo(Type dtoType, DtoSerializer serializer) : this()
+        public DtoInfo(Type dtoType, DtoSerializerOld serializer) : this()
         {
             DtoType = dtoType ?? throw new ArgumentNullException(nameof(dtoType));
-            Serializer = serializer ?? DtoSerializer.Default;
+            Serializer = serializer ?? DtoSerializerOld.Default;
 
         }
     }

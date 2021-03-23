@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
     <Version>0.1.1</Version>
     <Authors>Alexey Evlampiev</Authors>
     <Description>Reactive Applets Framework</Description>
@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Reactive" Version="4.*" />
+    <PackageReference Include="System.Reactive" Version="5.0.0" />
   </ItemGroup>
 
 </Project>

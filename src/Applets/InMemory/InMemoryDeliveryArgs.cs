@@ -1,5 +1,4 @@
-﻿using System;
-using Applets.Common;
+﻿using Applets.Common;
 
 namespace Applets.InMemory
 {

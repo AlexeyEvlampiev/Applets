@@ -4,23 +4,26 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Applets.InMemory;
 
 namespace Applets.Common
 {
     public abstract class DtoSerializer : IDtoSerializer
     {
-        private const string PersistedBlobStorageDataContractGuid = "a4edfc93-9dad-4576-b146-dba0aecc983c";
-        private static readonly Guid PersistedBlobStorageDataContractId = Guid.Parse(PersistedBlobStorageDataContractGuid);
+        protected interface IConstructionCallback
+        {
+            Guid GetDataContractId(Type dtoType);
+            bool CanSerialize(Type dtoType);
+        }
 
-        protected delegate Task<byte[]> SerializationHandler(IDto dto);
-        protected delegate Task<IDto> DeserializationHandler(DtoPackage package);
 
-        private SerializationHandler _serializationHandler;
-        private DeserializationHandler _deserializationHandler;
+        private readonly Lazy<JsonSerializerOptions> _defaultJsonSerializerOptions;
+        private readonly Lazy<Encoding> _defaultEncoding;
+        private readonly Dictionary<Guid, Type> _dtoTypesByDataContractId;
+
 
 
         [DebuggerStepThrough]
@@ -30,59 +33,78 @@ namespace Applets.Common
         }
 
         [DebuggerStepThrough]
+        protected DtoSerializer(IConstructionCallback ctorCallback)
+            : this(Enumerable.Empty<Assembly>(), ctorCallback ?? throw new ArgumentNullException(nameof(ctorCallback)))
+        {
+        }
+
+        [DebuggerStepThrough]
         protected DtoSerializer(IEnumerable<Assembly> dtoAssemblies) 
             : this(dtoAssemblies?.ToHashSet())
         {
         }
 
-        private DtoSerializer(HashSet<Assembly> assemblies)
+        [DebuggerStepThrough]
+        protected DtoSerializer(IEnumerable<Assembly> dtoAssemblies, IConstructionCallback ctorCallback)
+            : this(dtoAssemblies?.ToHashSet(), ctorCallback ?? throw new ArgumentNullException(nameof(ctorCallback)))
+        {
+        }
+
+        private DtoSerializer(
+            HashSet<Assembly> assemblies, 
+            IConstructionCallback ctorCallback = null)
         {
             if (assemblies == null) throw new ArgumentNullException(nameof(assemblies));
+            ctorCallback ??= new DefaultConstructionCallback();
+            _defaultJsonSerializerOptions = new Lazy<JsonSerializerOptions>(GetDefaultJsonSerializerOptions);
+            _defaultEncoding = new Lazy<Encoding>(()=> GetDefaultEncoding() ?? Encoding.UTF8);
+
             assemblies.Add(GetType().Assembly);
-            var dtoTypes = assemblies
+            _dtoTypesByDataContractId = assemblies
                 .SelectMany(a => a.GetTypes())
                 .Where(type => type.IsAssignableTo(typeof(IDto)))
                 .Where(type => type.IsAbstract == false)
-                .ToHashSet();
-
-
-            var serializationHandlersByType = new Lazy<Dictionary<Type, SerializationHandler>>(
-                () => BuildSerializationHandlersByTypeDictionary(dtoTypes));
-            var deserializationHandlersByDataContractId = new Lazy<Dictionary<Guid, DeserializationHandler>>(
-                ()=> BuildDeserializationHandlersByDataContractDictionary(dtoTypes));
-
-            _serializationHandler = (dto) =>
-            {
-                if (serializationHandlersByType
-                    .Value
-                    .TryGetValue(dto.GetType(), out var handler))
-                {
-                    return handler.Invoke(dto);
-                }
-
-                throw new InvalidOperationException();
-            };
-
-            _deserializationHandler = (package) =>
-            {
-                if (deserializationHandlersByDataContractId
-                    .Value
-                    .TryGetValue(package.DataContractId, out var handler))
-                {
-                    return handler.Invoke(package);
-                }
-
-                throw new InvalidOperationException();
-            };
+                .Where(ctorCallback.CanSerialize)
+                .ToDictionary(type => ctorCallback.GetDataContractId(type));
         }
 
-        
-        [Guid(PersistedBlobStorageDataContractGuid)]
-        sealed class PersistedStoreDto : Dto
+        [DebuggerStepThrough]
+        public static DtoSerializer CreateDefaultSerializer(IEnumerable<Assembly> dtoAssemblies)
+            => CreateDefaultSerializer(dtoAssemblies?.ToArray() ?? throw new ArgumentNullException(nameof(dtoAssemblies)));
+
+        [DebuggerStepThrough]
+        public static DtoSerializer CreateDefaultSerializer(Assembly assembly)
+            => CreateDefaultSerializer(new Assembly[]{ assembly ?? throw new ArgumentNullException(nameof(assembly)) } );
+
+
+        [DebuggerStepThrough]
+        public static DtoSerializer CreateDefaultSerializer(params Assembly[] dtoAssemblies)
         {
+            if (dtoAssemblies == null) throw new ArgumentNullException(nameof(dtoAssemblies));
+            if(dtoAssemblies.Length == 0) throw new ArgumentException($"DTO assemblies collection may not be empty.", nameof(dtoAssemblies));
+            Array.ForEach(dtoAssemblies, assembly =>
+            {
+                if (assembly is null) throw new ArgumentException("Collection contains null references");
+            });
+            return new InMemoryDtoSerializer(dtoAssemblies);
+        }
+
+        sealed class DefaultConstructionCallback : IConstructionCallback
+        {
+            Guid IConstructionCallback.GetDataContractId(Type dtoType) => dtoType.GUID;
+
+            bool IConstructionCallback.CanSerialize(Type dtoType)
+            {
+                var ctor = dtoType.GetConstructor(Array.Empty<Type>());
+                return (ctor?.IsPublic == true);
+            }
+        }
+        
+        sealed class PersistedStoreDto : IDto
+        {
+            private static readonly Guid DataContractId = Guid.Parse("a4edfc93-9dad-4576-b146-dba0aecc983c");
             public Guid PersistedBlobId { get; }
             public Guid PersistedDataContractId { get; }
-
 
             public PersistedStoreDto(Guid persistedBlobId, Guid persistedDataContractId)
             {
@@ -90,7 +112,7 @@ namespace Applets.Common
                 PersistedDataContractId = persistedDataContractId;
             }
 
-            public async Task<byte[]> SerializeAsync()
+            private async Task<byte[]> SerializeAsync()
             {
                 await using var stream = new MemoryStream();
                 await using var writer = new BinaryWriter(stream);
@@ -102,7 +124,7 @@ namespace Applets.Common
             }
 
 
-            public static PersistedStoreDto FromBytes(byte[] bytes)
+            private static PersistedStoreDto FromBytes(byte[] bytes)
             {
                 if (bytes == null) throw new ArgumentNullException(nameof(bytes));
                 using var stream = new MemoryStream(bytes);
@@ -112,34 +134,50 @@ namespace Applets.Common
                 var contractId = new Guid(reader.ReadBytes(16));
                 return new PersistedStoreDto(blobId, contractId);
             }
-        }
 
-
-        protected virtual bool CanSerialize(Type dtoType)
-        {
-            var ctor = dtoType.GetConstructor(Array.Empty<Type>());
-            return (ctor?.IsPublic == true);
-        }
-
-        protected virtual SerializationHandler GetSerializationHandler(Type dtoType)
-        {
-            return dto =>
+            public async Task<DtoPackage> PackAsync()
             {
-                var json = JsonSerializer.Serialize(dto);
-                var bytes = Encoding.UTF8.GetBytes(json);
-                return Task.FromResult(bytes);
-            };
+                var content = await SerializeAsync();
+                return new DtoPackage(DataContractId, content);
+            }
+
+            Guid IDto.DataContractId => DataContractId;
+
+            public static bool TryUnpack(DtoPackage package, out PersistedStoreDto dto)
+            {
+                if (package.DataContractId == DataContractId)
+                {
+                    dto = FromBytes(package.Content);
+                    return true;
+                }
+
+                dto = null;
+                return false;
+            }
         }
 
-        protected virtual DeserializationHandler GetDeserializationHandler(Type dtoType)
+        protected virtual JsonSerializerOptions GetDefaultJsonSerializerOptions() => new();
+        protected virtual Encoding GetDefaultEncoding() => Encoding.UTF8;
+
+        protected virtual Task<byte[]> SerializeAsync(IDto dto)
         {
-            return package =>
-            {
-                var json = Encoding.UTF8.GetString(package.Content);
-                var dto = (IDto)JsonSerializer.Deserialize(json, dtoType);
-                return Task.FromResult(dto);
-            };
+            if (dto == null) throw new ArgumentNullException(nameof(dto));
+            var json = JsonSerializer.Serialize(dto, _defaultJsonSerializerOptions.Value);
+            var bytes = (_defaultEncoding.Value ?? Encoding.UTF8).GetBytes(json);
+            return Task.FromResult(bytes);
         }
+
+
+        protected virtual Task<IDto> DeserializeAsync(byte[] content, Type returnType)
+        {
+            if (content == null) throw new ArgumentNullException(nameof(content));
+            var json = (_defaultEncoding.Value ?? Encoding.UTF8).GetString(content);
+            var dto = (IDto)JsonSerializer.Deserialize(json, returnType, _defaultJsonSerializerOptions.Value);
+            return Task.FromResult(dto);
+        }
+
+        
+
 
         protected abstract Task<IDto> UploadToPersistedBlobStoreAsync(Guid dataContractId, byte[] bytes);
         protected abstract Task<byte[]> DownloadFromPersistedBlobStoreAsync(Guid persistedBlobId);
@@ -151,7 +189,7 @@ namespace Applets.Common
         async Task<DtoPackage> IDtoSerializer.PackAsync(IDto dto)
         {
             if (dto == null) throw new ArgumentNullException(nameof(dto));
-            var bytes = await _serializationHandler.Invoke(dto) ?? throw new NullReferenceException();
+            var bytes = await SerializeAsync(dto) ?? throw new NullReferenceException();
             if (bytes.Length < MaxMessageBodyBytes)
             {
                 return new DtoPackage(dto.DataContractId, bytes);
@@ -160,51 +198,25 @@ namespace Applets.Common
             var persistedBlobId = Guid.NewGuid();
             await UploadToPersistedBlobStoreAsync(persistedBlobId, bytes);
             var blobStorageDto = new PersistedStoreDto(persistedBlobId, dto.DataContractId);
-            return new DtoPackage(PersistedBlobStorageDataContractId, await blobStorageDto.SerializeAsync());
+            return await blobStorageDto.PackAsync();
         }
 
         public async Task<IDto> UnpackAsync(DtoPackage dtoPackage)
         {
-            if (dtoPackage.DataContractId == PersistedBlobStorageDataContractId)
+            if (PersistedStoreDto.TryUnpack(dtoPackage, out var persistedStoreDto))
             {
-                var persistedStoreDto = PersistedStoreDto.FromBytes(dtoPackage.Content);
                 dtoPackage = new DtoPackage(
                     persistedStoreDto.PersistedDataContractId,
                     await DownloadFromPersistedBlobStoreAsync(persistedStoreDto.PersistedBlobId));
             }
 
-            return await _deserializationHandler.Invoke(dtoPackage);
-        }
-
-
-        private Dictionary<Type, SerializationHandler> BuildSerializationHandlersByTypeDictionary(IEnumerable<Type> dtoTypes)
-        {
-            if (dtoTypes == null) throw new ArgumentNullException(nameof(dtoTypes));
-            var map = dtoTypes
-                .Where(CanSerialize)
-                .Select(type => KeyValuePair.Create(type, GetSerializationHandler(type)))
-                .ToDictionary(pair => pair.Key, pair => pair.Value);
-            map.Add(typeof(PersistedStoreDto), dto =>
+            if (_dtoTypesByDataContractId.TryGetValue(dtoPackage.DataContractId, out var type))
             {
-                var persistedStoreDto = (PersistedStoreDto) dto;
-                return persistedStoreDto.SerializeAsync();
-            });
-            return map;
-        }
+                var dto = await this.DeserializeAsync(dtoPackage.Content, type);
+                return dto;
+            }
 
-        private Dictionary<Guid, DeserializationHandler> BuildDeserializationHandlersByDataContractDictionary(IEnumerable<Type> dtoTypes)
-        {
-            if (dtoTypes == null) throw new ArgumentNullException(nameof(dtoTypes));
-            var map = dtoTypes
-                .Where(CanSerialize)
-                .Select(type => KeyValuePair.Create(type, GetDeserializationHandler(type)))
-                .ToDictionary(pair => pair.Key.GUID, pair => pair.Value);
-            map.Add(typeof(PersistedStoreDto).GUID, package =>
-            {
-                var persistedStoreDto = (IDto)PersistedStoreDto.FromBytes(package.Content);
-                return Task.FromResult(persistedStoreDto);
-            });
-            return map;
+            throw new InvalidOperationException();
         }
     }
 }

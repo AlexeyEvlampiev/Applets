@@ -8,7 +8,7 @@ namespace Applets.Common
     [SuppressMessage("ReSharper", "InconsistentNaming")]
     public sealed class DtoSerializer_ctor_Should
     {
-        public sealed class TargetDto : Dto
+        public sealed class TargetDto : IDto
         {
         }
 

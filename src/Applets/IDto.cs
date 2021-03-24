@@ -4,6 +4,6 @@ namespace Applets
 {
     public interface IDto
     {
-        Guid DataContractId { get; }
+        public Guid DataContractId => GetType().GUID;
     }
 }

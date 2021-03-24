@@ -3,11 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30413.136
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Applets", "src\Applets\Applets.csproj", "{37517468-E7C7-4629-9F1E-14E3F1FA7E19}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Applets", "src\Applets\Applets.csproj", "{37517468-E7C7-4629-9F1E-14E3F1FA7E19}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{32BD1F7D-68A7-4F47-98A8-0BD35A1BABFE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Applets.XUnitTest", "src\Applets.XUnitTest\Applets.XUnitTest.csproj", "{C119287E-F21F-43C7-BB6F-BCA59593EA6B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Applets.XUnitTest", "src\Applets.XUnitTest\Applets.XUnitTest.csproj", "{C119287E-F21F-43C7-BB6F-BCA59593EA6B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Applets.Postgres", "src\Applets.Postgres\Applets.Postgres.csproj", "{B07AB679-C8A2-435E-BA15-15144D100F36}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Applets.Postgres.DbUp", "src\Applets.Postgres.DbUp\Applets.Postgres.DbUp.csproj", "{6046797B-815C-48C9-88A7-FFE1E8B8F003}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,6 +27,14 @@ Global
 		{C119287E-F21F-43C7-BB6F-BCA59593EA6B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C119287E-F21F-43C7-BB6F-BCA59593EA6B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C119287E-F21F-43C7-BB6F-BCA59593EA6B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B07AB679-C8A2-435E-BA15-15144D100F36}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B07AB679-C8A2-435E-BA15-15144D100F36}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B07AB679-C8A2-435E-BA15-15144D100F36}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B07AB679-C8A2-435E-BA15-15144D100F36}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6046797B-815C-48C9-88A7-FFE1E8B8F003}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6046797B-815C-48C9-88A7-FFE1E8B8F003}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6046797B-815C-48C9-88A7-FFE1E8B8F003}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6046797B-815C-48C9-88A7-FFE1E8B8F003}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

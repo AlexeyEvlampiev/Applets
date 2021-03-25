@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="dbup-postgresql" Version="4.5.0" />
     <PackageReference Include="McMaster.Extensions.CommandLineUtils" Version="3.1.0" />
   </ItemGroup>
 
@@ -14,9 +15,24 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Scripts\Increments\" />
+    <Folder Include="Scripts\Log\" />
     <Folder Include="Scripts\Data\" />
-    <Folder Include="Scripts\Updates\" />
+    <Folder Include="Scripts\Overrides\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Scripts\MasterScripts.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>MasterScripts.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Scripts\MasterScripts.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>MasterScripts.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

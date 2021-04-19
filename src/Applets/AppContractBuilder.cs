@@ -1,16 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text;
+using Applets.Common;
 
-namespace Applets.Common
+namespace Applets
 {
+    /// <summary>
+    /// <seealso cref="IAppContract"/> application contract builder.
+    /// </summary>
     public class AppContractBuilder
     {
+        #region Private Fields
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         private readonly Dictionary<MessageIntentId, MessageIntent> _messageIntentsById = new();
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         private readonly Dictionary<AppletId, Applet> _appletsById = new();
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         private readonly HashSet<AppletSubscriptionKey> _appletSubscriptionKeys = new();
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         private readonly HashSet<AppletResponseStreamKey> _appletResponseStreamKeys = new();
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         private readonly HashSet<AppletBroadcastKey> _appletBroadcastKeys = new();
 
+        #endregion
 
         public sealed class ResponseStreamKeyBuilder
         {
@@ -70,6 +88,11 @@ namespace Applets.Common
 
         public void EnableSubscription(AppletId subscriberId, MessageIntentId eventIntentId, Type dtoType)
         {
+            if (subscriberId == null) throw new ArgumentNullException(nameof(subscriberId));
+            if (eventIntentId == null) throw new ArgumentNullException(nameof(eventIntentId));
+            if (dtoType == null) throw new ArgumentNullException(nameof(dtoType));
+            ThrowIfNotExists(subscriberId);
+            ThrowIfNotExists(eventIntentId);
             _appletSubscriptionKeys.Add(new AppletSubscriptionKey(subscriberId, eventIntentId, dtoType));
         }
 
@@ -118,6 +141,11 @@ namespace Applets.Common
         protected virtual MessageIntentId CreateMessageIntentId<T>(T identifier) => MessageIntentId.Create(identifier);
         protected virtual AppletId CreateAppletId(object identifier) => AppletId.Create(identifier);
 
+        /// <summary>
+        /// Builds and validates the resulting <see cref="IAppContract"/> object.
+        /// </summary>
+        /// <returns>Application contract</returns>
+        /// <exception cref="AppContractBuilderException"></exception>
         public IAppContract Build()
         {
             Assert();
@@ -129,12 +157,36 @@ namespace Applets.Common
                 _appletResponseStreamKeys);
         }
 
+
+
         private void Assert()
         {
+            if (_messageIntentsById.Count == 0)
+            {
+                throw new AppContractBuilderException(
+                    new StringBuilder("Message intent registrations are missing.")
+                        .Append($" Use {nameof(AddMessageIntent)} method to register the required message intents."));
+            }
+
             
         }
 
+        private void ThrowIfNotExists(AppletId appletId)
+        {
+            if (false == _appletsById.ContainsKey(appletId))
+                throw new AppContractBuilderException(
+                    new StringBuilder($"{appletId} applet is not registered.")
+                        .Append($" Use {nameof(AddApplet)} method to register the required applet."));
+        }
 
-        
+        private void ThrowIfNotExists(MessageIntentId messageIntentId)
+        {
+            if (false == _messageIntentsById.ContainsKey(messageIntentId))
+                throw new AppContractBuilderException(
+                    new StringBuilder($"{messageIntentId} message intent is not registered.")
+                        .Append($" Use {nameof(AddMessageIntent)} method to register the required message intent."));
+        }
+
+
     }
 }

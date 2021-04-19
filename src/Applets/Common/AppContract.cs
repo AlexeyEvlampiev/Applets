@@ -38,7 +38,7 @@ namespace Applets.Common
         }
 
 
-        public bool CanEmitEvent(AppletId senderId, MessageIntentId eventIntentId, Type dtoType)
+        public bool IsValidEvent(AppletId senderId, MessageIntentId eventIntentId, Type dtoType)
         {
             if (senderId == null) throw new ArgumentNullException(nameof(senderId));
             if (eventIntentId == null) throw new ArgumentNullException(nameof(eventIntentId));
@@ -46,7 +46,7 @@ namespace Applets.Common
             return _appletBroadcastKeys.Contains(new AppletBroadcastKey(senderId, eventIntentId, dtoType));
         }
 
-        public bool CanBroadcastRequest(AppletId senderId, MessageIntentId requestIntentId, Type dtoType)
+        public bool IsValidRequest(AppletId senderId, MessageIntentId requestIntentId, Type dtoType)
         {
             if (senderId == null) throw new ArgumentNullException(nameof(senderId));
             if (requestIntentId == null) throw new ArgumentNullException(nameof(requestIntentId));
@@ -55,26 +55,26 @@ namespace Applets.Common
             return _appletStreamRequestKeys.Contains(key);
         }
 
-        public bool IsEventSubscriber(AppletId appletId)
+        public bool IsEventListener(AppletId receiverId)
         {
-            if (appletId == null) throw new ArgumentNullException(nameof(appletId));
-            return _subscriberApplets.Contains(appletId);
+            if (receiverId == null) throw new ArgumentNullException(nameof(receiverId));
+            return _subscriberApplets.Contains(receiverId);
         }
 
-        public bool HasSubscription(AppletId appletId, MessageIntentId messageIntentId, Type eventType)
+        public bool IsValidSubscription(AppletId receiverId, MessageIntentId eventIntentId, Type dtoType)
         {
-            if (appletId == null) throw new ArgumentNullException(nameof(appletId));
-            if (messageIntentId == null) throw new ArgumentNullException(nameof(messageIntentId));
-            if (eventType == null) throw new ArgumentNullException(nameof(eventType));
-            return _appletSubscriptionKeys.Contains(new AppletSubscriptionKey(appletId, messageIntentId, eventType));
+            if (receiverId == null) throw new ArgumentNullException(nameof(receiverId));
+            if (eventIntentId == null) throw new ArgumentNullException(nameof(eventIntentId));
+            if (dtoType == null) throw new ArgumentNullException(nameof(dtoType));
+            return _appletSubscriptionKeys.Contains(new AppletSubscriptionKey(receiverId, eventIntentId, dtoType));
         }
 
-        public bool CanAcceptReply(AppletId appletId, MessageIntentId messageIntentId, Type replyType)
+        public bool IsValidResponse(AppletId receiverId, MessageIntentId responseIntentId, Type dtoType)
         {
-            if (appletId == null) throw new ArgumentNullException(nameof(appletId));
-            if (messageIntentId == null) throw new ArgumentNullException(nameof(messageIntentId));
-            if (replyType == null) throw new ArgumentNullException(nameof(replyType));
-            return _appletRpcReplyKeys.Contains(new AppletRpcReplyKey(appletId, messageIntentId, replyType));
+            if (receiverId == null) throw new ArgumentNullException(nameof(receiverId));
+            if (responseIntentId == null) throw new ArgumentNullException(nameof(responseIntentId));
+            if (dtoType == null) throw new ArgumentNullException(nameof(dtoType));
+            return _appletRpcReplyKeys.Contains(new AppletRpcReplyKey(receiverId, responseIntentId, dtoType));
         }
 
         public MessageIntent GetIntent(MessageIntentId intentId)

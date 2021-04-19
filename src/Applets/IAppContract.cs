@@ -6,19 +6,19 @@ namespace Applets
 {
     public interface IAppContract
     {
-        bool CanEmitEvent(AppletId senderId, MessageIntentId eventIntentId, Type dtoType);
-        bool CanBroadcastRequest(AppletId senderId, MessageIntentId requestIntentId, Type dtoType);
-        bool IsEventSubscriber(AppletId appletId);
-        bool HasSubscription(AppletId appletId, MessageIntentId messageIntentId, Type eventType);
+        bool IsValidEvent(AppletId senderId, MessageIntentId eventIntentId, Type dtoType);
+        bool IsValidRequest(AppletId senderId, MessageIntentId requestIntentId, Type dtoType);
+        bool IsEventListener(AppletId appletId);
+        bool IsValidSubscription(AppletId receiverId, MessageIntentId eventIntentId, Type dtoType);
 
-        bool CanAcceptReply(AppletId appletId, MessageIntentId argsMessageIntent, Type replyType);
+        bool IsValidResponse(AppletId receiverId, MessageIntentId responseIntentId, Type dtoType);
 
 
         [DebuggerStepThrough]
-        public bool CanAcceptReply(AppletId appletId, IDeliveryArgs args)
+        public bool IsValidResponse(AppletId receiverId, IDeliveryArgs args)
         {
-            if (appletId is null || args is null) return false;
-            return this.CanAcceptReply(appletId, args.MessageIntent, args.Data.GetType());
+            if (receiverId is null || args is null) return false;
+            return this.IsValidResponse(receiverId, args.MessageIntent, args.Data.GetType());
         }
 
         MessageIntent GetIntent(MessageIntentId intentId);

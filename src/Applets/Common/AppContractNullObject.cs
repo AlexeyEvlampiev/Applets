@@ -6,14 +6,14 @@ namespace Applets.Common
 {
     sealed class AppContractNullObject : IAppContract
     {
-        public bool CanEmitEvent(AppletId senderId, MessageIntentId eventIntentId, Type dtoType) => true;
+        public bool IsValidEvent(AppletId senderId, MessageIntentId eventIntentId, Type dtoType) => true;
 
-        public bool CanBroadcastRequest(AppletId senderId, MessageIntentId requestIntentId, Type dtoType) => true;
+        public bool IsValidRequest(AppletId senderId, MessageIntentId requestIntentId, Type dtoType) => true;
 
-        public bool IsEventSubscriber(AppletId appletId) => true;
+        public bool IsEventListener(AppletId receiverId) => true;
 
-        public bool HasSubscription(AppletId appletId, MessageIntentId messageIntentId, Type eventType) => true;
-        public bool CanAcceptReply(AppletId appletId, MessageIntentId argsMessageIntent, Type replyType) => true;
+        public bool IsValidSubscription(AppletId receiverId, MessageIntentId eventIntentId, Type dtoType) => true;
+        public bool IsValidResponse(AppletId receiverId, MessageIntentId responseIntentId, Type dtoType) => true;
 
         public bool CanAcceptReply(AppletId appletId, MessageIntent argsMessageIntent, Type replyType) => true;
 

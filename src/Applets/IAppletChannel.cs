@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Reactive.Threading.Tasks;
 using System.Threading;
 using System.Threading.Tasks;
+using Applets.Common;
 
 namespace Applets
 {
@@ -57,8 +58,8 @@ namespace Applets
         bool CanProcessEvent(MessageIntentId eventIntentId, Type dtoType);
         bool CanEmitEvent(MessageIntentId eventIntentId, Type dtoType);
 
-        
-
         protected IEnumerable<EventKey> EventSubscriptionKeys { get; }
+
+        public IAppletOutboundChannel AsOutboundChannel() => RelayAppletOutboundChannel.Wrap(this);
     }
 }

@@ -53,21 +53,21 @@ namespace Applets.Common
         {
             if (requestIntentId == null) return false;
             if (dtoType == null) return false;
-            return AppContract.CanBroadcastRequest(Applet, requestIntentId, dtoType);
+            return AppContract.IsValidRequest(Applet, requestIntentId, dtoType);
         }
 
         public bool CanAcceptReply(MessageIntentId replyIntentId, Type dtoType)
         {
             if (replyIntentId == null) return false;
             if (dtoType == null) return false;
-            return AppContract.CanAcceptReply(Applet, replyIntentId, dtoType);
+            return AppContract.IsValidResponse(Applet, replyIntentId, dtoType);
         }
 
         public bool CanProcessEvent(MessageIntentId eventIntentId, Type dtoType)
         {
             if (eventIntentId == null) return false;
             if (dtoType == null) return false;
-            return AppContract.HasSubscription(Applet, eventIntentId, dtoType);
+            return AppContract.IsValidSubscription(Applet, eventIntentId, dtoType);
         }
 
         [DebuggerStepThrough]
@@ -81,7 +81,7 @@ namespace Applets.Common
         {
             if (eventIntentId == null) return false;
             if (dtoType == null) return false;
-            return AppContract.CanEmitEvent(Applet, eventIntentId, dtoType);
+            return AppContract.IsValidEvent(Applet, eventIntentId, dtoType);
         }
 
         IEnumerable<EventKey> IAppletChannel.EventSubscriptionKeys => throw new NotImplementedException();
@@ -93,7 +93,7 @@ namespace Applets.Common
             if (intentId == null) throw new ArgumentNullException(nameof(intentId));
             if (data == null) throw new ArgumentNullException(nameof(data));
             if (conversationTtl.Ticks < 1) throw new ArgumentOutOfRangeException(nameof(conversationTtl));
-            if (AppContract.CanBroadcastRequest(Applet.Id, intentId, data.GetType()))
+            if (AppContract.IsValidRequest(Applet.Id, intentId, data.GetType()))
             {
                 return this
                     .GetResponses(intentId, data, conversationTtl)
@@ -110,7 +110,7 @@ namespace Applets.Common
             if (messageIntentId == null) throw new ArgumentNullException(nameof(messageIntentId));
             if (data == null) throw new ArgumentNullException(nameof(data));
             cancellation.ThrowIfCancellationRequested();
-            if (AppContract.CanEmitEvent(Applet.Id, messageIntentId, data.GetType()))
+            if (AppContract.IsValidEvent(Applet.Id, messageIntentId, data.GetType()))
             {
                 return this.EmitEventAsync(messageIntentId, data, timeToLive, enqueueDelay, cancellation);
             }
@@ -124,7 +124,7 @@ namespace Applets.Common
             ThrowIfDisposed();
             if (callback == null) throw new ArgumentNullException(nameof(callback));
             cancellation.ThrowIfCancellationRequested();
-            if (AppContract.IsEventSubscriber(Applet.Id))
+            if (AppContract.IsEventListener(Applet.Id))
             {
                 return this.ProcessEventLogAsync(callback, cancellation);
             }
@@ -195,7 +195,7 @@ namespace Applets.Common
         protected bool CanProcessReply(IDeliveryArgs args)
         {
             return args != null &&
-                   AppContract.CanAcceptReply(Applet, args);
+                   AppContract.IsValidResponse(Applet, args);
         }
 
 

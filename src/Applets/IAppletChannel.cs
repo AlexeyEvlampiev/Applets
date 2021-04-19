@@ -1,48 +1,64 @@
-﻿
-using System;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Reactive.Threading.Tasks;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Applets
 {
-    public interface IAppletChannel : IDisposable
+    /// <summary>
+    /// Applet specific connection to the application message broker.
+    /// </summary>
+    public interface IAppletChannel : IAppletOutboundChannel, IDisposable
     {
-        string AppletName { get; }
-        Guid Instance { get; }
-        Guid AppletId { get; }
 
-        IObservable<IDeliveryArgs> GetResponses(DispatchArgs request);
-
-        Task SendAsync(DispatchArgs args, CancellationToken cancellation = default);
-
-        IObservable<IDeliveryArgs> GetResponses(object request);
-        IObservable<IDeliveryArgs> GetResponses(object request, Guid intent);
-
-        IObservable<IDeliveryArgs> CreateProcessedEventNotificationsObservable(
-            DEventNotificationHandler processOneAsync);
-
-        IDisposable ProcessEventNotifications(
-            DEventNotificationHandler processOneAsync);
+        /// <summary>
+        /// Processes application events received on this connection.
+        /// </summary>
+        /// <param name="callback">The message handling callback.</param>
+        /// <param name="cancellation">The cancellation.</param>
+        Task ListenAsync(Func<IEventArgs, Task> callback, CancellationToken cancellation = default);
 
 
-        IAppInfo GetAppInfo();
-        Task SendErrorAsync(object data, CancellationToken cancellation = default);
+        public Task ListenAsync(IDeliveryCallback callback, CancellationToken cancellation = default)
+        {
+            if (callback == null) throw new ArgumentNullException(nameof(callback));
+            cancellation.ThrowIfCancellationRequested();
+            return ListenAsync(args => callback.InvokeAsync(args, this, cancellation), cancellation);
+        }
 
-        Task SendErrorAsync(string message, CancellationToken cancellation = default);
+        [DebuggerStepThrough]
+        public IDisposable Subscribe(
+            Func<IEventArgs, Task> callback,
+            CancellationToken cancellation = default)
+        {
+            return this
+                .ListenAsync(callback, cancellation)
+                .ToObservable()
+                .Subscribe();
+        }
 
-        Task SendWarningAsync(object data, CancellationToken cancellation = default);
 
-        Task SendWarningAsync(string message, CancellationToken cancellation = default);
+        [DebuggerStepThrough]
+        public IDisposable Subscribe(
+            IDeliveryCallback callback,
+            CancellationToken cancellation = default)
+        {
+            return this
+                .ListenAsync(callback, cancellation)
+                .ToObservable()
+                .Subscribe();
+        }
 
-        Task SendInfoAsync(object data, CancellationToken cancellation = default);
 
-        Task SendInfoAsync(string message, CancellationToken cancellation = default);
+        bool CanSendRequest(MessageIntentId requestIntentId, Type dtoType);
+        bool CanAcceptReply(MessageIntentId replyIntentId, Type dtoType);
+        bool CanProcessEvent(MessageIntentId eventIntentId, Type dtoType);
+        bool CanEmitEvent(MessageIntentId eventIntentId, Type dtoType);
 
-        bool CanSend(Guid intent);
-        bool CanReceiveEventNotification(Guid intent);
+        
 
-        bool CanSend(DispatchArgs args);
-        bool CanReceiveEventNotification(IDeliveryArgs args);
-        void Pulse();
+        protected IEnumerable<EventKey> EventSubscriptionKeys { get; }
     }
 }

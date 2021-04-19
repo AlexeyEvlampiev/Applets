@@ -1,23 +1,11 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace Applets
+﻿namespace Applets
 {
-    public interface IDeliveryArgs
+    public interface IDeliveryArgs 
     {
-        byte[] Body { get; }
-        Guid IntentId { get; }
-        string IntentName { get; }
-        Guid CorrelationId { get; }
-        Guid From { get; }
-        Guid DataContractId { get; }
-        Guid AppletId { get; }
-        string AppletName { get; }
-        object Dto { get; }
-        Task ReplyWithAsync(object dto, CancellationToken cancellation = default);
-        Task ReplyWithAsync(DispatchArgs reply, CancellationToken cancellation = default);
+        Applet SenderApplet { get; }
+        MessageIntent MessageIntent { get; }
+        object Data { get; }
 
-        bool HasCorrelationId { get; }
+        public bool IntentIs(MessageIntentId reference) => MessageIntent.Id.Equals(reference);
     }
 }

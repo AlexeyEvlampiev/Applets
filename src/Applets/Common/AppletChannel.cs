@@ -1,11 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reactive;
-using System.Reactive.Concurrency;
-using System.Reactive.Disposables;
+using System.Linq;
 using System.Reactive.Linq;
-using System.Reactive.Subjects;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,322 +11,209 @@ namespace Applets.Common
 {
     public abstract class AppletChannel : IAppletChannel
     {
-        private readonly IAppInfo _appInfo;
-        private readonly CancellationTokenSource _cancellationSource = new CancellationTokenSource();
-        private readonly EventLoopScheduler _privateEventLoopScheduler = new EventLoopScheduler();
-        private readonly IConnectableObservable<IDeliveryArgs> _privateResponses;
-        readonly Dictionary<Guid, IObserver<IDeliveryArgs>> _privateResponseObserversByCorrelationId = new Dictionary<Guid, IObserver<IDeliveryArgs>>();
-        private int _privateResponsesConnected;
-        private readonly Subject<Unit> _pulse = new Subject<Unit>();
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        private int _disposed = 0;
 
 
-        protected AppletChannel(Guid appletId, IAppInfo appInfo)
-        {
-            _appInfo = appInfo ?? throw new ArgumentNullException(nameof(appInfo));
-            if(false == appInfo.IsAppletId(appletId))
-                throw new ArgumentException($"Invalid applet ID. Application: {appInfo.ApplicationName}, Applet ID: {appletId}");
-            AppletId = appletId;
-            Instance = Guid.NewGuid();
+        public Applet Applet { get; }
+        public IAppContract AppContract { get; }
 
-            var disposing = _cancellationSource.Token.ToObservable();
-
-            _privateResponses = Observable
-                .Defer(CreatePrivateResponsesObservable)
-                .TakeUntil(disposing)
-                .ObserveOn(_privateEventLoopScheduler)
-                .Do(InspectPrivateResponse)
-                .Do(args=> Pulse())
-                .Where(IsValidResponse)
-                .Publish();
-
-            _privateResponses
-                .SubscribeOn(_privateEventLoopScheduler)
-                .Where(response => _privateResponseObserversByCorrelationId.ContainsKey(response.CorrelationId))
-                .Subscribe(
-                    OnPrivateResponse, 
-                    OnPrivateResponsesError, 
-                    OnPrivateResponsesCompleted);
-
-            Observable
-                .Interval(_appInfo.HeartbeatInterval)
-                .TakeUntil(disposing)
-                .SkipUntil(_pulse)
-                .Select(CreateHeartbeatDto)
-                .Select(ToDispatchArgs)
-                .Subscribe(args =>
-                {
-                    args.IntentId = AppInfo.HeartbeatIntent;
-                    SendAsync(args);
-                });
-        }
-
-        protected abstract IObservable<IDeliveryArgs> CreatePrivateResponsesObservable();
-
-        protected virtual object CreateHeartbeatDto(long sequenceId) => new { sequenceId };
-
-
-        private void OnPrivateResponse(IDeliveryArgs response)
-        {
-            if (_privateResponseObserversByCorrelationId.TryGetValue(response.CorrelationId, out var targetObserver))
-            {
-                targetObserver.OnNext(response);
-            }
-        }
-
-
-        private void OnPrivateResponsesError(Exception ex)
-        {
-            foreach (var observer in _privateResponseObserversByCorrelationId.Values)
-            {
-                observer.OnError(ex);
-            }
-        }
-
-        private void OnPrivateResponsesCompleted()
-        {
-            foreach (var observer in _privateResponseObserversByCorrelationId.Values)
-            {
-                observer.OnCompleted();
-            }
-
-            _privateResponseObserversByCorrelationId.Clear();
-        }
-
-        private bool IsValidResponse(IDeliveryArgs response)
-        {
-            if (response.From == this.Instance) return false;
-            return true;
-        }
-
-        private void InspectPrivateResponse(IDeliveryArgs obj)
+        [DebuggerStepThrough]
+        protected AppletChannel(AppletId appletId) 
+            : this(appletId, new AppContractNullObject())
         {
             
         }
 
-        
-
-        
-        public string AppletName => _appInfo.GetAppletName(ApplicationId);
-
-
-        public Task SendAsync(DispatchArgs args, CancellationToken cancellation = default)
+        protected AppletChannel(AppletId appletId, IAppContract appAppContract)
         {
-            if (args == null) throw new ArgumentNullException(nameof(args));
-            cancellation.ThrowIfCancellationRequested();
-            args.From = this.Instance;
-            args.AppletId = this.AppletId;
+            AppContract = appAppContract ?? throw new ArgumentNullException(nameof(appAppContract));
+            Applet = AppContract.GetApplet(appletId ?? throw new ArgumentNullException(nameof(appletId)));
+        }
 
-            if (CanSend(args.IntentId))
+
+        protected abstract IObservable<IReplyArgs> GetResponses(MessageIntentId intentId, object data, TimeSpan conversationTtl);
+        protected abstract Task EmitEventAsync(MessageIntentId messageIntentId, object data, TimeSpan? timeToLive = null, TimeSpan? enqueueDelay = null, CancellationToken cancellation = default);
+        protected abstract Task ProcessEventLogAsync(Func<IEventArgs, Task> callback, CancellationToken cancellation = default);
+
+
+        [DebuggerNonUserCode]
+        protected bool IsDisposed => (Thread.VolatileRead(ref _disposed) > 0);
+
+        [DebuggerNonUserCode]
+        protected void ThrowIfDisposed()
+        {
+            if (IsDisposed)
             {
-                return this.BroadcastAsync(args, cancellation);
+                throw new ObjectDisposedException($"{Applet.Name} applet channel");
             }
+        }
 
-            var intentName = _appInfo.GetIntentName(args.IntentId);
-            throw new InvalidOperationException(
-                new StringBuilder($"The specified outgoing message intent is forbidden for this applet.")
-                    .Append($" Sender applet: {AppletName} ({AppletId}).")
-                    .Append($" Message intent: {intentName} ({args.IntentId}).")
-                    .Append($" See {_appInfo.GetType()} type constructor.")
-                    .ToString()
-            );
+        public bool CanSendRequest(MessageIntentId requestIntentId, Type dtoType)
+        {
+            if (requestIntentId == null) return false;
+            if (dtoType == null) return false;
+            return AppContract.CanBroadcastRequest(Applet, requestIntentId, dtoType);
+        }
+
+        public bool CanAcceptReply(MessageIntentId replyIntentId, Type dtoType)
+        {
+            if (replyIntentId == null) return false;
+            if (dtoType == null) return false;
+            return AppContract.CanAcceptReply(Applet, replyIntentId, dtoType);
+        }
+
+        public bool CanProcessEvent(MessageIntentId eventIntentId, Type dtoType)
+        {
+            if (eventIntentId == null) return false;
+            if (dtoType == null) return false;
+            return AppContract.HasSubscription(Applet, eventIntentId, dtoType);
         }
 
         [DebuggerStepThrough]
-        public IObservable<IDeliveryArgs> GetResponses(object request)
+        public bool CanProcessEvent(IDeliveryArgs args)
         {
-            if (request == null) throw new ArgumentNullException(nameof(request));
-            return GetResponses(request, request.GetType().GUID);
+            if (args is null) return false;
+            return CanProcessEvent(args.MessageIntent, args.Data.GetType());
         }
 
-        public IObservable<IDeliveryArgs> GetResponses(object request, Guid intent)
+        public bool CanEmitEvent(MessageIntentId eventIntentId, Type dtoType)
         {
-            if (request == null) throw new ArgumentNullException(nameof(request));
-            var args = ToDispatchArgs(request);
-            args.IntentId = intent;
-            args.CorrelationId = Guid.NewGuid();
-            return GetResponses(args);
+            if (eventIntentId == null) return false;
+            if (dtoType == null) return false;
+            return AppContract.CanEmitEvent(Applet, eventIntentId, dtoType);
         }
 
-        public IObservable<IDeliveryArgs> CreateProcessedEventNotificationsObservable(
-            DEventNotificationHandler processOneAsync)
+        IEnumerable<EventKey> IAppletChannel.EventSubscriptionKeys => throw new NotImplementedException();
+
+        //[DebuggerStepThrough]
+        IObservable<IReplyArgs> IAppletOutboundChannel.GetResponses(MessageIntentId intentId, object data, TimeSpan conversationTtl)
         {
-            return Observable
-                .Defer(() => RegisterEventNotificationsHandler(processOneAsync))
-                .Do(args=> Pulse());
-        }
-
-        protected abstract IObservable<IDeliveryArgs> RegisterEventNotificationsHandler(
-            DEventNotificationHandler processOneAsync);
-
-        public IDisposable ProcessEventNotifications(DEventNotificationHandler processOneAsync)
-        {
-            if (processOneAsync == null) throw new ArgumentNullException(nameof(processOneAsync));
-            return CreateProcessedEventNotificationsObservable(processOneAsync)
-                .Subscribe();
-        }
-
-
-
-        public IObservable<IDeliveryArgs> GetResponses(DispatchArgs args)
-        {
-            if (args == null) throw new ArgumentNullException(nameof(args));
-            if (false == args.HasCorrelationId)
-                throw new ArgumentException($"{nameof(args)}.{nameof(args.CorrelationId)} is missing.");
-
-            if (0 == Interlocked.CompareExchange(ref _privateResponsesConnected, 1, 0))
+            ThrowIfDisposed();
+            if (intentId == null) throw new ArgumentNullException(nameof(intentId));
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (conversationTtl.Ticks < 1) throw new ArgumentOutOfRangeException(nameof(conversationTtl));
+            if (AppContract.CanBroadcastRequest(Applet.Id, intentId, data.GetType()))
             {
-                _privateResponses.Connect();
+                return this
+                    .GetResponses(intentId, data, conversationTtl)
+                    .Take(conversationTtl);
             }
 
-            return Observable
-                .Create<IDeliveryArgs>(Subscribe)
-                .SubscribeOn(_privateEventLoopScheduler)
-                .Do(InspectAndLog)
-                .Where(IsIntentPermitted)
-                .ObserveOn(_privateEventLoopScheduler);
-                
+            throw new AppContractViolationException($"Request broadcast is forbidden. Applet: {Applet}, intent: {AppContract.GetIntent(intentId)}, requestType: {data.GetType()}");
+        }
 
-            IDisposable Subscribe(IObserver<IDeliveryArgs> observer)
+        [DebuggerStepThrough]
+        Task IAppletOutboundChannel.EmitEventAsync(MessageIntentId messageIntentId, object data, TimeSpan? timeToLive, TimeSpan? enqueueDelay, CancellationToken cancellation)
+        {
+            ThrowIfDisposed();
+            if (messageIntentId == null) throw new ArgumentNullException(nameof(messageIntentId));
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            cancellation.ThrowIfCancellationRequested();
+            if (AppContract.CanEmitEvent(Applet.Id, messageIntentId, data.GetType()))
             {
-                observer = observer.NotifyOn(TaskPoolScheduler.Default);
-                var subscription = Disposable.Create(() =>
-                    _privateResponseObserversByCorrelationId.Remove(args.CorrelationId));
-                try
-                {
-                    _privateResponseObserversByCorrelationId.TryAdd(args.CorrelationId, observer);
-                    SendAsync(args);
-                    return subscription;
-                }
-                catch
-                {
-                    subscription.Dispose();
-                    throw;
-                }
-
+                return this.EmitEventAsync(messageIntentId, data, timeToLive, enqueueDelay, cancellation);
             }
 
-            bool IsIntentPermitted(IDeliveryArgs reply) =>
-                _appInfo.IsExpectedReply(AppletId, args.IntentId, reply.IntentId);
+            throw new AppContractViolationException();
+        }
 
-            void InspectAndLog(IDeliveryArgs reply)
+        //[DebuggerStepThrough]
+        Task IAppletChannel.ListenAsync(Func<IEventArgs, Task> callback, CancellationToken cancellation)
+        {
+            ThrowIfDisposed();
+            if (callback == null) throw new ArgumentNullException(nameof(callback));
+            cancellation.ThrowIfCancellationRequested();
+            if (AppContract.IsEventSubscriber(Applet.Id))
             {
-                if (false == IsIntentPermitted(reply))
+                return this.ProcessEventLogAsync(callback, cancellation);
+            }
+
+            throw new AppContractViolationException();
+        }
+
+
+        Task IAppletChannel.ListenAsync(IDeliveryCallback callbacksMap, CancellationToken cancellation)
+        {
+            if (callbacksMap == null) throw new ArgumentNullException(nameof(callbacksMap));
+            cancellation.ThrowIfCancellationRequested();
+            var self = (IAppletChannel)this;
+
+            var handlersByEventKey = new Dictionary<EventKey, DDeliveryCallback>();
+            var requiredEventKeys = AppContract.GetEventKeys(Applet.Id)?.ToHashSet() 
+                                    ?? throw new NullReferenceException($"{nameof(AppContract)}.{nameof(AppContract.GetEventKeys)}");
+            foreach (var key in callbacksMap.Keys)
+            {
+                if (self.CanProcessEvent(key.EventIntentId, key.DtoType))
                 {
-                    Trace.TraceError(new StringBuilder("Unexpected Fan-Out response.")
-                        .Append($" Initiating applet: {AppletName}.")
-                        .Append($" Fan-Out request: {_appInfo.GetIntentName(args.IntentId)}.")
-                        .Append($" Fan-Out response: {reply.IntentName}.")
-                        .ToString()
-                    );
+                    var handler = callbacksMap.GetHandler(key);
+                    handlersByEventKey.Add(key, handler);
+                }
+                else
+                {
+                    var intent = AppContract.GetIntent(key.EventIntentId);
+                    throw new AppContractViolationException(
+                        new StringBuilder("Redundant event handler.")
+                            .Append($"Applet: {Applet}. Event intent: {intent}. Event DTO type: {key.DtoType}")
+                        .ToString());
                 }
             }
+
+            var missingHandlers = requiredEventKeys
+                .Except(callbacksMap.Keys)
+                .Select(key => new
+                {
+                    Intent = AppContract.GetIntent(key.EventIntentId),
+                    DtoType = key.DtoType
+                })
+                .Select(item=> $"event intent: {item.Intent}, DTO type: {item.DtoType}")
+                .ToList();
+
+            if (missingHandlers.Any() && false == (AppContract is AppContractNullObject))
+            {
+                throw new AppContractViolationException(
+                    new StringBuilder("Missing event handlers.")
+                        .Append($"Applet: {Applet}. Missing handlers: {string.Join(";", missingHandlers)}")
+                        .ToString());
+            }
+
+            return self.ListenAsync(args =>
+            {
+                var key = new EventKey(args.MessageIntent, args.Data.GetType());
+                if (handlersByEventKey.TryGetValue(key, out var handler))
+                {
+                    return handler.Invoke(args, this, cancellation);
+                }
+
+                return Task.CompletedTask;
+            }, cancellation);
         }
 
-        public IAppInfo GetAppInfo() => _appInfo;
 
-        protected abstract Task BroadcastAsync(DispatchArgs args, CancellationToken cancellation);
 
-        public Guid AppletId { get; }
-
-        public Guid Instance { get; }
-
-        public Task SendErrorAsync(object data, CancellationToken cancellation = default)
+        [DebuggerStepThrough]
+        protected bool CanProcessReply(IDeliveryArgs args)
         {
-            if (data == null) throw new ArgumentNullException(nameof(data));
-            var args = ToDispatchArgs(data);
-            args.IntentId = AppInfo.ErrorIntent;
-            return SendAsync(args, cancellation);
-        }
-
-        public Task SendErrorAsync(string message, CancellationToken cancellation = default)
-        {
-            if (String.IsNullOrWhiteSpace(message)) throw new ArgumentException($"Message text is required", nameof(message));
-            var args = ToDispatchArgs(message);
-            args.IntentId = AppInfo.ErrorIntent;
-            return SendAsync(args, cancellation);
-        }
-
-        public Task SendWarningAsync(object data, CancellationToken cancellation = default)
-        {
-            if (data == null) throw new ArgumentNullException(nameof(data));
-            var args = ToDispatchArgs(data);
-            args.IntentId = AppInfo.WarningIntent;
-            return SendAsync(args, cancellation);
-        }
-
-        public Task SendWarningAsync(string message, CancellationToken cancellation = default)
-        {
-            if (String.IsNullOrWhiteSpace(message)) throw new ArgumentException($"Message text is required", nameof(message));
-            var args = ToDispatchArgs(message);
-            args.IntentId = AppInfo.WarningIntent;
-            return SendAsync(args, cancellation);
-        }
-
-        public Task SendInfoAsync(object data, CancellationToken cancellation = default)
-        {
-            if (data == null) throw new ArgumentNullException(nameof(data));
-            var args = ToDispatchArgs(data);
-            args.IntentId = AppInfo.InfoIntent;
-            return SendAsync(args, cancellation);
-        }
-
-        public Task SendInfoAsync(string message, CancellationToken cancellation = default)
-        {
-            if (String.IsNullOrWhiteSpace(message)) throw new ArgumentException($"Message text is required", nameof(message));
-            var args = ToDispatchArgs(message);
-            args.IntentId = AppInfo.InfoIntent;
-            return SendAsync(args, cancellation);
-        }
-
-        public bool CanSend(Guid intent)
-        {
-            return _appInfo.CanSend(AppletId, intent);
-        }
-
-        public bool CanReceiveEventNotification(Guid intent)
-        {
-            return _appInfo.CanReceiveEventNotification(AppletId, intent);
-        }
-
-        public bool CanSend(DispatchArgs args)
-        {
-            if (args == null) throw new ArgumentNullException(nameof(args));
-            return CanSend(args.IntentId);
-        }
-
-        public bool CanReceiveEventNotification(IDeliveryArgs args)
-        {
-            if (args == null) throw new ArgumentNullException(nameof(args));
-            return CanReceiveEventNotification(args.IntentId) && args.From != this.Instance;
-        }
-
-        public void Pulse()
-        {
-            _pulse.OnNext(Unit.Default);
+            return args != null &&
+                   AppContract.CanAcceptReply(Applet, args);
         }
 
 
-        public Guid ApplicationId => _appInfo.ApplicationId;
 
-        public string ApplicationName => _appInfo.ApplicationName;
+        [DebuggerStepThrough]
+        protected bool SentByAnotherApplet(IDeliveryArgs args) => (args.SenderApplet.Id != this.Applet.Id);
 
+        public override string ToString() => Applet.ToString();
 
-        public DispatchArgs ToDispatchArgs(object dto)
-        {
-            var args = _appInfo.ToDispatchArgs(dto);
-            args.AppletId = this.AppletId;
-            args.From = this.Instance;
-            return args;
-        }
-
-        protected bool IsSubscribedFor(DeliveryArgs args)
-        {
-            return _appInfo.CanReceiveEventNotification(AppletId, args.IntentId);
-        }
+        public override int GetHashCode() => Applet.GetHashCode();
 
         protected virtual void Dispose(bool disposing)
         {
-            _cancellationSource.Cancel();
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+
+            }
+
         }
 
         public void Dispose()
@@ -342,7 +226,5 @@ namespace Applets.Common
         {
             Dispose(false);
         }
-
-
     }
 }

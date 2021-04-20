@@ -8,26 +8,26 @@ namespace Applets.Common
     {
         record AppletRpcReplyKey(AppletId AppletId, MessageIntentId MessageIntentId, Type ReplyType);
 
-        private readonly HashSet<AppletResponseStreamKey> _appletRpcKeys;
+        private readonly HashSet<AppletRpcKey> _appletRpcKeys;
         private readonly HashSet<AppletRpcReplyKey> _appletRpcReplyKeys;
-        private readonly HashSet<AppletSubscriptionKey> _appletSubscriptionKeys;
+        private readonly HashSet<AppletTriggerKey> _appletSubscriptionKeys;
         private readonly Dictionary<MessageIntentId, MessageIntent> _messageIntentsById;
         private readonly Dictionary<AppletId, Applet> _appletsById;
         private readonly HashSet<AppletId> _subscriberApplets;
-        private readonly HashSet<AppletBroadcastKey> _appletStreamRequestKeys;
-        private readonly HashSet<AppletBroadcastKey> _appletBroadcastKeys;
+        private readonly HashSet<AppletEventKey> _appletStreamRequestKeys;
+        private readonly HashSet<AppletEventKey> _appletBroadcastKeys;
 
         public AppContract(
             IEnumerable<MessageIntent> messageIntents,
             IEnumerable<Applet> applets,
-            IEnumerable<AppletBroadcastKey> appletBroadcastKeys,
-            IEnumerable<AppletSubscriptionKey> appletSubscriptionKeys,
-            IEnumerable<AppletResponseStreamKey> appletRpcKeys)
+            IEnumerable<AppletEventKey> appletBroadcastKeys,
+            IEnumerable<AppletTriggerKey> appletSubscriptionKeys,
+            IEnumerable<AppletRpcKey> appletRpcKeys)
         {
             if (messageIntents == null) throw new ArgumentNullException(nameof(messageIntents));
             if (applets == null) throw new ArgumentNullException(nameof(applets));
             _appletRpcKeys = appletRpcKeys?.ToHashSet() ?? throw new ArgumentNullException(nameof(appletRpcKeys));
-            _appletStreamRequestKeys = _appletRpcKeys.Select(key => new AppletBroadcastKey(key.AppletId, key.RequestIntentId, key.RequestType)).ToHashSet();
+            _appletStreamRequestKeys = _appletRpcKeys.Select(key => new AppletEventKey(key.AppletId, key.RequestIntentId, key.RequestType)).ToHashSet();
             _appletBroadcastKeys = appletBroadcastKeys?.ToHashSet() ?? throw new ArgumentNullException(nameof(appletBroadcastKeys));
             _appletSubscriptionKeys = (appletSubscriptionKeys ?? throw new ArgumentNullException(nameof(appletSubscriptionKeys))).ToHashSet();
             _messageIntentsById = messageIntents.ToDictionary(intent => intent.Id);
@@ -43,7 +43,7 @@ namespace Applets.Common
             if (senderId == null) throw new ArgumentNullException(nameof(senderId));
             if (eventIntentId == null) throw new ArgumentNullException(nameof(eventIntentId));
             if (dtoType == null) throw new ArgumentNullException(nameof(dtoType));
-            return _appletBroadcastKeys.Contains(new AppletBroadcastKey(senderId, eventIntentId, dtoType));
+            return _appletBroadcastKeys.Contains(new AppletEventKey(senderId, eventIntentId, dtoType));
         }
 
         public bool IsValidRequest(AppletId senderId, MessageIntentId requestIntentId, Type dtoType)
@@ -51,7 +51,7 @@ namespace Applets.Common
             if (senderId == null) throw new ArgumentNullException(nameof(senderId));
             if (requestIntentId == null) throw new ArgumentNullException(nameof(requestIntentId));
             if (dtoType == null) throw new ArgumentNullException(nameof(dtoType));
-            var key = new AppletBroadcastKey(senderId, requestIntentId, dtoType);
+            var key = new AppletEventKey(senderId, requestIntentId, dtoType);
             return _appletStreamRequestKeys.Contains(key);
         }
 
@@ -66,7 +66,7 @@ namespace Applets.Common
             if (receiverId == null) throw new ArgumentNullException(nameof(receiverId));
             if (eventIntentId == null) throw new ArgumentNullException(nameof(eventIntentId));
             if (dtoType == null) throw new ArgumentNullException(nameof(dtoType));
-            return _appletSubscriptionKeys.Contains(new AppletSubscriptionKey(receiverId, eventIntentId, dtoType));
+            return _appletSubscriptionKeys.Contains(new AppletTriggerKey(receiverId, eventIntentId, dtoType));
         }
 
         public bool IsValidResponse(AppletId receiverId, MessageIntentId responseIntentId, Type dtoType)

@@ -13,7 +13,7 @@ namespace Applets
             var applet = builder.AddApplet("MyApplet");
             var foreignIntent = MessageIntentId.Create("Foreign intent");
             Assert.Throws<AppContractBuilderException>(()=>
-                builder.EnableSubscription(applet, foreignIntent, typeof(string)));
+                builder.EnableAppletTrigger(applet, foreignIntent, typeof(string)));
         }
 
         [Fact]
@@ -23,7 +23,7 @@ namespace Applets
             var foreignApplet = AppletId.Create("Foreign applet");
             var intent = builder.AddMessageIntent("MyIntent");
             Assert.Throws<AppContractBuilderException>(() =>
-                builder.EnableSubscription(foreignApplet, intent, typeof(string)));
+                builder.EnableAppletTrigger(foreignApplet, intent, typeof(string)));
         }
     }
 }

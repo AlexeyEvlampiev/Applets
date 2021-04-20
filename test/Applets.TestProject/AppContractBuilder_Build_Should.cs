@@ -16,11 +16,11 @@ namespace Applets
             var greetingSender = builder.AddApplet("GreetingSender");
             var greetingReceiver = builder.AddApplet("GreetingReceiver");
 
-            builder.EnableResponseStream(greetingSender, greeting, typeof(string),
-                responses => responses.Add(greetingReply, typeof(string)));
+            builder.EnableAppletRpc(greetingSender, greeting, typeof(string),
+                responses => responses.WithResponse(greetingReply, typeof(string)));
 
-            builder.EnableSubscription(greetingReceiver, greeting, typeof(string));
-            builder.EnableBroadcast(greetingReceiver, greetingReply, typeof(string));
+            builder.EnableAppletTrigger(greetingReceiver, greeting, typeof(string));
+            builder.EnableAppletEvent(greetingReceiver, greetingReply, typeof(string));
 
             var appContract = builder.Build();
             Assert.True(appContract.IsValidRequest(greetingSender, greeting, typeof(string)));
@@ -57,14 +57,14 @@ namespace Applets
             var greetingReceiver = builder.AddApplet("GreetingReceiver");
             Assert.Throws<AppContractBuilderException>(builder.Build);
 
-            builder.EnableResponseStream(greetingSender, greeting, typeof(string),
-                responses => responses.Add(greetingReply, typeof(string)));
+            builder.EnableAppletRpc(greetingSender, greeting, typeof(string), rpcConfig => rpcConfig
+                    .WithResponse(greetingReply, typeof(string)));
             Assert.Throws<AppContractBuilderException>(builder.Build);
 
-            builder.EnableSubscription(greetingReceiver, greeting, typeof(string));
+            builder.EnableAppletTrigger(greetingReceiver, greeting, typeof(string));
             Assert.Throws<AppContractBuilderException>(builder.Build);
 
-            builder.EnableBroadcast(greetingReceiver, greetingReply, typeof(string));
+            builder.EnableAppletEvent(greetingReceiver, greetingReply, typeof(string));
             Assert.Throws<AppContractBuilderException>(builder.Build);
 
             builder.Build();

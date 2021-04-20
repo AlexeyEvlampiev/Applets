@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using Applets.Common;
 
@@ -20,13 +21,15 @@ namespace Applets
         private readonly Dictionary<AppletId, Applet> _appletsById = new();
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        private readonly HashSet<AppletSubscriptionKey> _appletSubscriptionKeys = new();
+        private readonly HashSet<AppletEventKey> _appletEventKeys = new();
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        private readonly HashSet<AppletResponseStreamKey> _appletResponseStreamKeys = new();
+        private readonly HashSet<AppletTriggerKey> _appletTriggerKeys = new();
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        private readonly HashSet<AppletBroadcastKey> _appletBroadcastKeys = new();
+        private readonly HashSet<AppletRpcKey> _appletRpcKeys = new();
+
+        
 
         #endregion
 
@@ -35,7 +38,7 @@ namespace Applets
             private readonly AppletId _appletId;
             private readonly MessageIntentId _requestIntentId;
             private readonly Type _requestType;
-            private readonly HashSet<AppletResponseStreamKey> _keys = new HashSet<AppletResponseStreamKey>();
+            private readonly HashSet<AppletRpcKey> _keys = new HashSet<AppletRpcKey>();
 
             internal ResponseStreamKeyBuilder(AppletId appletId, MessageIntentId requestIntentId, Type requestType)
             {
@@ -44,19 +47,20 @@ namespace Applets
                 _requestType = requestType ?? throw new ArgumentNullException(nameof(requestType));
             }
 
-            public void Add(MessageIntentId replyIntentId, Type replyType)
+            public ResponseStreamKeyBuilder WithResponse(MessageIntentId replyIntentId, Type replyType)
             {
                 if (replyIntentId == null) throw new ArgumentNullException(nameof(replyIntentId));
                 if (replyType == null) throw new ArgumentNullException(nameof(replyType));
-                _keys.Add(new AppletResponseStreamKey(
+                _keys.Add(new AppletRpcKey(
                     _appletId,
                     _requestIntentId,
                     _requestType,
                     replyIntentId,
                     replyType));
+                return this;
             }
 
-            internal HashSet<AppletResponseStreamKey> Keys => _keys;
+            internal HashSet<AppletRpcKey> Keys => _keys;
         }
 
 
@@ -86,31 +90,42 @@ namespace Applets
             return applet;
         }
 
-        public void EnableSubscription(AppletId subscriberId, MessageIntentId eventIntentId, Type dtoType)
+        public void EnableAppletTrigger(AppletId appletId, MessageIntentId triggerIntentId, Type dtoType)
         {
-            if (subscriberId == null) throw new ArgumentNullException(nameof(subscriberId));
-            if (eventIntentId == null) throw new ArgumentNullException(nameof(eventIntentId));
+            if (appletId == null) throw new ArgumentNullException(nameof(appletId));
+            if (triggerIntentId == null) throw new ArgumentNullException(nameof(triggerIntentId));
             if (dtoType == null) throw new ArgumentNullException(nameof(dtoType));
-            ThrowIfNotExists(subscriberId);
-            ThrowIfNotExists(eventIntentId);
-            _appletSubscriptionKeys.Add(new AppletSubscriptionKey(subscriberId, eventIntentId, dtoType));
+            ThrowIfNotExists(appletId);
+            ThrowIfNotExists(triggerIntentId);
+            _appletTriggerKeys.Add(new AppletTriggerKey(appletId, triggerIntentId, dtoType));
         }
 
-        public void EnableBroadcast(AppletId senderAppletId, MessageIntentId eventIntentId, Type dtoType)
+        public void EnableAppletEvent(AppletId senderAppletId, MessageIntentId eventIntentId, Type dtoType)
         {
             if (senderAppletId == null) throw new ArgumentNullException(nameof(senderAppletId));
             if (eventIntentId == null) throw new ArgumentNullException(nameof(eventIntentId));
             if (dtoType == null) throw new ArgumentNullException(nameof(dtoType));
-            _appletBroadcastKeys.Add(new AppletBroadcastKey(senderAppletId, eventIntentId, dtoType));
+            ThrowIfNotExists(senderAppletId);
+            ThrowIfNotExists(eventIntentId);
+            _appletEventKeys.Add(new AppletEventKey(senderAppletId, eventIntentId, dtoType));
         }
 
-        public void EnableResponseStream(AppletId appletId,
+        public void EnableAppletRpc(
+            AppletId appletId,
             MessageIntentId requestIntentId,
-            Type requestType,
+            Type requestDtoType,
             MessageIntentId responseIntentId,
             Type responseType)
         {
-            _appletResponseStreamKeys.Add(new AppletResponseStreamKey(appletId, requestIntentId, requestType,
+            if (appletId == null) throw new ArgumentNullException(nameof(appletId));
+            if (requestIntentId == null) throw new ArgumentNullException(nameof(requestIntentId));
+            if (requestDtoType == null) throw new ArgumentNullException(nameof(requestDtoType));
+            if (responseIntentId == null) throw new ArgumentNullException(nameof(responseIntentId));
+            if (responseType == null) throw new ArgumentNullException(nameof(responseType));
+            ThrowIfNotExists(appletId);
+            ThrowIfNotExists(requestIntentId);
+            ThrowIfNotExists(responseIntentId);
+            _appletRpcKeys.Add(new AppletRpcKey(appletId, requestIntentId, requestDtoType,
                 responseIntentId, responseType));
         }
 
@@ -123,17 +138,25 @@ namespace Applets
             return applet;
         }
 
-        public void EnableResponseStream(
+        public void EnableAppletRpc(
             AppletId appletId, 
             MessageIntentId requestIntentId, 
-            Type requestType,
-            Action<ResponseStreamKeyBuilder> responses)
+            Type requestDtoType,
+            Action<ResponseStreamKeyBuilder> rpcConfig)
         {
-            var responseStreamKeyBuilder = new ResponseStreamKeyBuilder(appletId, requestIntentId, requestType);
-            responses.Invoke(responseStreamKeyBuilder);
+            if (appletId == null) throw new ArgumentNullException(nameof(appletId));
+            if (requestIntentId == null) throw new ArgumentNullException(nameof(requestIntentId));
+            if (requestDtoType == null) throw new ArgumentNullException(nameof(requestDtoType));
+            if (rpcConfig == null) throw new ArgumentNullException(nameof(rpcConfig));
+            ThrowIfNotExists(appletId);
+            ThrowIfNotExists(requestIntentId);
+            var responseStreamKeyBuilder = new ResponseStreamKeyBuilder(appletId, requestIntentId, requestDtoType);
+
+            rpcConfig.Invoke(responseStreamKeyBuilder);
             foreach (var key in responseStreamKeyBuilder.Keys)
             {
-                _appletResponseStreamKeys.Add(key);
+                ThrowIfNotExists(key.ResponseIntentId);
+                _appletRpcKeys.Add(key);
             }
 
         }
@@ -152,9 +175,9 @@ namespace Applets
             return new AppContract(
                 _messageIntentsById.Values,
                 _appletsById.Values,
-                _appletBroadcastKeys,
-                _appletSubscriptionKeys,
-                _appletResponseStreamKeys);
+                _appletEventKeys,
+                _appletTriggerKeys,
+                _appletRpcKeys);
         }
 
 
@@ -165,10 +188,42 @@ namespace Applets
             {
                 throw new AppContractBuilderException(
                     new StringBuilder("Message intent registrations are missing.")
-                        .Append($" Use {nameof(AddMessageIntent)} method to register the required message intents."));
+                        .Append($" Use {nameof(AddMessageIntent)} method to register the required intents."));
             }
 
-            
+            if (_appletsById.Count == 0)
+            {
+                throw new AppContractBuilderException(
+                    new StringBuilder("Applet registrations are missing.")
+                        .Append($" Use {nameof(AddApplet)} method to register the required applets."));
+            }
+
+            if (_appletTriggerKeys.Count == 0)
+            {
+                throw new AppContractBuilderException(
+                    new StringBuilder("Applet trigger registrations are missing.")
+                        .Append($" Use {nameof(EnableAppletTrigger)} method to register the required triggers."));
+            }
+
+            var missingTriggerActivators = _appletTriggerKeys
+                .OfType<ITriggerKey>()
+                .Where(triggerKey => _appletEventKeys.Any(triggerKey.IsMatch) == false &&
+                                     _appletRpcKeys.Any(triggerKey.IsMatch) == false)
+                .ToList();
+            if (missingTriggerActivators.Any())
+            {
+                var missingRegistrationsCsv = string.Join(", ", missingTriggerActivators
+                    .Select(k=> $"{k.MessageIntentId} ({k.DtoType})"));
+                var recipientAppletsCsv = string.Join(", ", missingTriggerActivators
+                    .OfType<AppletTriggerKey>()
+                    .Select(key => $"{key.AppletId}"));
+                throw new AppContractBuilderException(
+                    new StringBuilder("Missing broadcast registrations.")
+                        .Append($" Broadcast(s) to register: {missingRegistrationsCsv}.")
+                        .Append($" Broadcast subscribers: {recipientAppletsCsv}.")
+                        .Append($" Use {nameof(EnableAppletEvent)} and/or {nameof(EnableAppletRpc)} methods to register these broadcast(s)."));
+            }
+
         }
 
         private void ThrowIfNotExists(AppletId appletId)

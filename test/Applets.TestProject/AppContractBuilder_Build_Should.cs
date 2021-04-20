@@ -65,8 +65,6 @@ namespace Applets
             Assert.Throws<AppContractBuilderException>(builder.Build);
 
             builder.EnableAppletEvent(greetingReceiver, greetingReply, typeof(string));
-            Assert.Throws<AppContractBuilderException>(builder.Build);
-
             builder.Build();
         }
     }

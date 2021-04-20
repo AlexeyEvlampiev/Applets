@@ -2,5 +2,6 @@
 
 namespace Applets.Common
 {
-    record AppletEventKey(AppletId SenderAppletId, MessageIntentId MessageIntentId, Type DtoType) : IBroadcastKey;
+    record AppletEventKey(AppletId AppletId, MessageIntentId MessageIntentId, Type DtoType)
+        : IBroadcastKey;
 }

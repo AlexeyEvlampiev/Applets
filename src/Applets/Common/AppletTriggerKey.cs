@@ -2,5 +2,5 @@
 
 namespace Applets.Common
 {
-    record AppletTriggerKey(AppletId AppletId, MessageIntentId MessageIntentId, Type DtoType) : IBroadcastKey;
+    record AppletTriggerKey(AppletId AppletId, MessageIntentId MessageIntentId, Type DtoType) : ITriggerKey;
 }

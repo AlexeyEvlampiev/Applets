@@ -205,15 +205,25 @@ namespace Applets
                         .Append($" Use {nameof(EnableAppletTrigger)} method to register the required triggers."));
             }
 
+            ThrowIfMissingBroadcasts();
+            ThrowIfMissingTriggers();
+        }
+
+        private void ThrowIfMissingBroadcasts()
+        {
             var missingBroadcasts = _appletTriggerKeys
-                .OfType<IBroadcastKey>()
+                .OfType<ITriggerKey>()
                 .Where(triggerKey => _appletEventKeys.Any(triggerKey.IsMatch) == false &&
                                      _appletRpcKeys.Any(triggerKey.IsMatch) == false)
+                .ToList();
+            var missingRpcHandlerKeys = _appletRpcKeys
+                .OfType<ITriggerKey>()
+                .Where(triggerKey => _appletEventKeys.Any(triggerKey.IsMatch) == false)
                 .ToList();
             if (missingBroadcasts.Any())
             {
                 var missingRegistrationsCsv = string.Join(", ", missingBroadcasts
-                    .Select(k=> $"{k.MessageIntentId} ({k.DtoType})"));
+                    .Select(k => $"{k.MessageIntentId} ({k.DtoType})"));
                 var recipientAppletsCsv = string.Join(", ", missingBroadcasts
                     .OfType<AppletTriggerKey>()
                     .Select(key => $"{key.AppletId}"));
@@ -221,7 +231,66 @@ namespace Applets
                     new StringBuilder("Missing broadcast registrations.")
                         .Append($" Broadcast(s) to register: {missingRegistrationsCsv}.")
                         .Append($" Broadcast subscribers: {recipientAppletsCsv}.")
-                        .Append($" Use {nameof(EnableAppletEvent)} and/or {nameof(EnableAppletRpc)} methods to register these broadcast(s)."));
+                        .Append(
+                            $" Use {nameof(EnableAppletEvent)} and/or {nameof(EnableAppletRpc)} methods to register these broadcast(s)."));
+            }
+
+            if (missingRpcHandlerKeys.Any())
+            {
+                var missingRegistrationsCsv = string.Join(", ", missingRpcHandlerKeys
+                    .Select(k => $"{k.MessageIntentId} ({k.DtoType})"));
+                var callingAppletsCsv = string.Join(", ", missingRpcHandlerKeys
+                    .OfType<AppletRpcKey>()
+                    .Select(key => $"{key.AppletId}"));
+                throw new AppContractBuilderException(
+                    new StringBuilder("Missing broadcast registrations.")
+                        .Append($" Broadcast(s) to register: {missingRegistrationsCsv}.")
+                        .Append($" Unbound callers: {callingAppletsCsv}.")
+                        .Append($" Use {nameof(EnableAppletEvent)} method to register these broadcast(s)."));
+            }
+        }
+
+        private void ThrowIfMissingTriggers()
+        {
+            var unboundEventKeys = _appletEventKeys
+                .OfType<IBroadcastKey>()
+                .Where(requiredKey =>
+                    false == _appletTriggerKeys.Any(requiredKey.IsMatch) &&
+                    false == _appletRpcKeys.Any(requiredKey.IsMatch))
+                .ToList();
+            var unboundRpcKeys = _appletRpcKeys
+                .OfType<IBroadcastKey>()
+                .Where(requiredKey => false == _appletTriggerKeys.Any(requiredKey.IsMatch))
+                .ToList();
+            if (unboundEventKeys.Any())
+            {
+
+                var missingRegistrationsCsv = string.Join(", ", unboundEventKeys
+                    .Select(k => $"{k.MessageIntentId} ({k.DtoType})"));
+                var broadcastingAppletsCsv = string.Join(", ", unboundEventKeys
+                    .OfType<AppletEventKey>()
+                    .Select(key => $"{key.AppletId}"));
+                throw new AppContractBuilderException(
+                    new StringBuilder("Missing trigger registrations.")
+                        .Append($" Trigger(s) to register: {missingRegistrationsCsv}.")
+                        .Append($" Broadcasting applets: {broadcastingAppletsCsv}.")
+                        .Append(
+                            $" Use the {nameof(EnableAppletTrigger)} method to register these trigger(s)."));
+            }
+
+            if (unboundRpcKeys.Any())
+            {
+                var missingRegistrationsCsv = string.Join(", ", unboundRpcKeys
+                    .Select(k => $"{k.MessageIntentId} ({k.DtoType})"));
+                var callingAppletsCsv = string.Join(", ", unboundRpcKeys
+                    .OfType<AppletRpcKey>()
+                    .Select(key => $"{key.AppletId}"));
+                throw new AppContractBuilderException(
+                    new StringBuilder("Missing trigger registrations.")
+                        .Append($" Trigger(s) to register: {missingRegistrationsCsv}.")
+                        .Append($" Calling applets: {callingAppletsCsv}.")
+                        .Append(
+                            $" Use the {nameof(EnableAppletTrigger)} method to register these trigger(s)."));
             }
 
         }

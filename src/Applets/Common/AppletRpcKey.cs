@@ -5,11 +5,14 @@ namespace Applets.Common
     record AppletRpcKey(
         AppletId AppletId,
         MessageIntentId RequestIntentId,
-        Type RequestType,
+        Type RequestDtoType,
         MessageIntentId ResponseIntentId,
-        Type ResponseType) : IBroadcastKey
+        Type ResponseDtoType) : IBroadcastKey, ITriggerKey
     {
         MessageIntentId IBroadcastKey.MessageIntentId => RequestIntentId;
-        Type IBroadcastKey.DtoType => RequestType;
+        Type IBroadcastKey.DtoType => RequestDtoType;
+
+        MessageIntentId ITriggerKey.MessageIntentId => ResponseIntentId;
+        Type ITriggerKey.DtoType => ResponseDtoType;
     }
 }

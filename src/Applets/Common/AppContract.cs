@@ -27,14 +27,14 @@ namespace Applets.Common
             if (messageIntents == null) throw new ArgumentNullException(nameof(messageIntents));
             if (applets == null) throw new ArgumentNullException(nameof(applets));
             _appletRpcKeys = appletRpcKeys?.ToHashSet() ?? throw new ArgumentNullException(nameof(appletRpcKeys));
-            _appletStreamRequestKeys = _appletRpcKeys.Select(key => new AppletEventKey(key.AppletId, key.RequestIntentId, key.RequestType)).ToHashSet();
+            _appletStreamRequestKeys = _appletRpcKeys.Select(key => new AppletEventKey(key.AppletId, key.RequestIntentId, key.RequestDtoType)).ToHashSet();
             _appletBroadcastKeys = appletBroadcastKeys?.ToHashSet() ?? throw new ArgumentNullException(nameof(appletBroadcastKeys));
             _appletSubscriptionKeys = (appletSubscriptionKeys ?? throw new ArgumentNullException(nameof(appletSubscriptionKeys))).ToHashSet();
             _messageIntentsById = messageIntents.ToDictionary(intent => intent.Id);
             _appletsById = applets.ToDictionary(applet => applet.Id);
             _subscriberApplets = _appletSubscriptionKeys.Select(key => key.AppletId).ToHashSet();
             _appletRpcReplyKeys = _appletRpcKeys
-                .Select(key => new AppletRpcReplyKey(key.AppletId, key.ResponseIntentId, key.ResponseType)).ToHashSet();
+                .Select(key => new AppletRpcReplyKey(key.AppletId, key.ResponseIntentId, key.ResponseDtoType)).ToHashSet();
         }
 
 

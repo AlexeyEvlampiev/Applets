@@ -7,9 +7,9 @@ namespace Applets.Common
         MessageIntentId RequestIntentId,
         Type RequestType,
         MessageIntentId ResponseIntentId,
-        Type ResponseType) : ITriggerKey
+        Type ResponseType) : IBroadcastKey
     {
-        MessageIntentId ITriggerKey.MessageIntentId => ResponseIntentId;
-        Type ITriggerKey.DtoType => RequestType;
+        MessageIntentId IBroadcastKey.MessageIntentId => RequestIntentId;
+        Type IBroadcastKey.DtoType => RequestType;
     }
 }

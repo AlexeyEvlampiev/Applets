@@ -3,12 +3,12 @@
 
 namespace Applets.Common
 {
-    interface ITriggerKey
+    interface IBroadcastKey
     {
         MessageIntentId MessageIntentId { get; }
         Type DtoType { get; }
 
-        public bool IsMatch(ITriggerKey other)
+        public bool IsMatch(IBroadcastKey other)
         {
             if (other is null) return false;
             if (MessageIntentId is null) return false;

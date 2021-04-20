@@ -205,16 +205,16 @@ namespace Applets
                         .Append($" Use {nameof(EnableAppletTrigger)} method to register the required triggers."));
             }
 
-            var missingTriggerActivators = _appletTriggerKeys
-                .OfType<ITriggerKey>()
+            var missingBroadcasts = _appletTriggerKeys
+                .OfType<IBroadcastKey>()
                 .Where(triggerKey => _appletEventKeys.Any(triggerKey.IsMatch) == false &&
                                      _appletRpcKeys.Any(triggerKey.IsMatch) == false)
                 .ToList();
-            if (missingTriggerActivators.Any())
+            if (missingBroadcasts.Any())
             {
-                var missingRegistrationsCsv = string.Join(", ", missingTriggerActivators
+                var missingRegistrationsCsv = string.Join(", ", missingBroadcasts
                     .Select(k=> $"{k.MessageIntentId} ({k.DtoType})"));
-                var recipientAppletsCsv = string.Join(", ", missingTriggerActivators
+                var recipientAppletsCsv = string.Join(", ", missingBroadcasts
                     .OfType<AppletTriggerKey>()
                     .Select(key => $"{key.AppletId}"));
                 throw new AppContractBuilderException(
